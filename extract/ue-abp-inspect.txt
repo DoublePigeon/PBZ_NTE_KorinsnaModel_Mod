@@ -1,0 +1,4 @@
+generated class = /Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C
+function_graphs: AnimBlueprint: Failed to find property 'function_graphs' for attribute 'function_graphs' on 'AnimBlueprint'
+ubergraph_pages: AnimBlueprint: Failed to find property 'ubergraph_pages' for attribute 'ubergraph_pages' on 'AnimBlueprint'
+anim_graph: AnimBlueprint: Failed to find property 'anim_graph' for attribute 'anim_graph' on 'AnimBlueprint'

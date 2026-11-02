@@ -1,0 +1,26 @@
+retargeter /Game/Korinsna/RTG_HunToKorinsna ops=6
+source rig=/Game/Korinsna/IKR_Hun.IKR_Hun
+target rig=/Game/Korinsna/IKR_Korinsna.IKR_Korinsna
+retarget pose source=Default Pose target=Default Pose
+target retarget root=Bip001-Pelvis
+source retarget root=pelvis
+  op[00] Pelvis Motion            enabled=True
+  op[01] FK Chains                enabled=True
+  op[02] Retarget IK Goals        enabled=False
+  op[03] Run IK Rig               enabled=False
+  op[04] Root Motion              enabled=True
+  op[05] Remap Curves             enabled=False
+chain map (9 entries):
+  Root             <- Root            
+  Spine            <- Spine           
+  Neck             <- Neck            
+  LeftClavicle     <- LeftClavicle    
+  RightClavicle    <- RightClavicle   
+  LeftArm          <- LeftArm         
+  RightArm         <- RightArm        
+  LeftLeg          <- LeftLeg         
+  RightLeg         <- RightLeg        
+anim blueprint /Game/Korinsna/ABP_Korinsna_Retarget
+  target skeleton=/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton
+  generated class=/Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C
+  asset class=AnimBlueprint

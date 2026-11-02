@@ -1,0 +1,8 @@
+removing /HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton (Skeleton)
+imported: ['/HuaShira/Characters/Hero/Hero_Hun/HunSkeletonDonor_Skeleton.HunSkeletonDonor_Skeleton', '/HuaShira/Characters/Hero/Hero_Hun/HunSkeletonDonor.HunSkeletonDonor']
+donor skeleton: /HuaShira/Characters/Hero/Hero_Hun/HunSkeletonDonor_Skeleton
+rename /HuaShira/Characters/Hero/Hero_Hun/HunSkeletonDonor_Skeleton -> /HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton : True
+discarding leftover /HuaShira/Characters/Hero/Hero_Hun/HunSkeletonDonor.HunSkeletonDonor (SkeletalMesh)
+game skeleton class: Skeleton
+skeleton asset present: True
+folder now: ['/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton.Hun_Skin_Skeleton']

@@ -1,0 +1,11 @@
+skel=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton.Hun_Skin_Skeleton
+bone count=1172
+first 8=['Hun_Skin', 'root', 'pelvis', 'spine_01', 'spine_02', 'spine_03', 'spine_04', 'spine_05']
+last 8=['center_of_mass', 'Pt_Cam', 'ik_weapon_root', 'ik_weapon_l', 'ik_weapon_l_child', 'ik_weapon_r', 'ik_weapon_r_child', 'root_Socket']
+has Root=False has root=True
+root     LOCAL loc=(0.000, -0.000, 0.000) quat=(-0.0000, 0.0000, 0.0000, -1.0000)
+pelvis   LOCAL loc=(-0.000, -5.145, 109.208) quat=(0.0026, 0.7071, -0.0026, -0.7071)
+foot_l   LOCAL loc=(-50.142, 0.000, 0.000) quat=(0.0711, -0.0550, 0.0729, -0.9933)
+hand_r   LOCAL loc=(-25.396, -0.000, 0.000) quat=(-0.8358, -0.0556, 0.0252, -0.5457)
+mesh=/HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Body_Simple.Hun_Body_Simple skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton.Hun_Skin_Skeleton
+mesh materials=8

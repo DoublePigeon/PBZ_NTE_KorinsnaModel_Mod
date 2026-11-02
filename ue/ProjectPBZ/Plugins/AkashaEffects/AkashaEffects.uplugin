@@ -1,0 +1,15 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "AkashaEffects",
+	"Description": "Content mount mirroring the host game material library path.",
+	"Category": "Modding",
+	"CreatedBy": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"EnabledByDefault": true,
+	"Modules": []
+}

@@ -1,0 +1,8 @@
+FAILED   could not clear /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Cloth/CA_Hun_Cape
+FAILED   could not clear /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Cloth/CA_Hun_Cape_Climax
+FAILED   could not clear /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Cloth/CA_Hun_Hair01
+FAILED   could not clear /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Cloth/CA_Hun_Skirt
+FAILED   could not clear /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Cloth/CA_Hun_Skirt_Climax
+FAILED   could not clear /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Cloth/CA_Hun_UpperCloth
+FAILED   could not clear /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Cloth/CA_Hun_UpperCloth_Climax
+emptied 0 of 7 cloth assets

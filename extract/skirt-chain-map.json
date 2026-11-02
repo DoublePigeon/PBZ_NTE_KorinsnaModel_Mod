@@ -1,0 +1,80 @@
+[
+ {
+  "game_chain": [
+   "bns_cloak_01",
+   "bns_cloak_06"
+  ],
+  "korinsna_chain": [
+   "xiongshi_1",
+   "xiongshi_28"
+  ],
+  "distance_cm": 34.56,
+  "game_count": 6,
+  "korinsna_count": 22
+ },
+ {
+  "game_chain": [
+   "bns_frontSkirtArmorRibbon_01",
+   "bns_frontSkirtArmorRibbon_05"
+  ],
+  "korinsna_chain": [
+   "m_skirt_1",
+   "m_skirt_5"
+  ],
+  "distance_cm": 4.84,
+  "game_count": 5,
+  "korinsna_count": 5
+ },
+ {
+  "game_chain": [
+   "bns_ribbon_0_01",
+   "bns_ribbon_0_05"
+  ],
+  "korinsna_chain": [
+   "l_skirt_1",
+   "l_skirt_17"
+  ],
+  "distance_cm": 7.64,
+  "game_count": 5,
+  "korinsna_count": 15
+ },
+ {
+  "game_chain": [
+   "bns_skirt_0_01_l",
+   "bns_skirt_0_05_l"
+  ],
+  "korinsna_chain": [
+   "qunshi_1",
+   "qunshi_38"
+  ],
+  "distance_cm": 9.85,
+  "game_count": 5,
+  "korinsna_count": 30
+ },
+ {
+  "game_chain": [
+   "bns_skirt_0_01_r",
+   "bns_skirt_0_05_r"
+  ],
+  "korinsna_chain": [
+   "r_skirt_1",
+   "r_skirt_17"
+  ],
+  "distance_cm": 4.23,
+  "game_count": 5,
+  "korinsna_count": 15
+ },
+ {
+  "game_chain": [
+   "bns_skirt_1_01_l",
+   "bns_skirt_1_05_l"
+  ],
+  "korinsna_chain": [
+   "b_skirt_1",
+   "b_skirt_5"
+  ],
+  "distance_cm": 20.67,
+  "game_count": 5,
+  "korinsna_count": 5
+ }
+]

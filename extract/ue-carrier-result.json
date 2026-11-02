@@ -1,0 +1,8 @@
+{
+ "asset": "/HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Head_New",
+ "mesh": "/HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Head_New.Hun_Head_New",
+ "skeleton": "/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton",
+ "anim_blueprint": "/Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C",
+ "slots": 8,
+ "bones": 369
+}

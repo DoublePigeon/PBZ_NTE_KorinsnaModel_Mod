@@ -1,0 +1,19 @@
+== anim blueprint
+generated=/Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C
+target skeleton=/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton
+graph AnimGraph
+  node AnimGraphNode_Root_0 class=AnimGraphNode_Root
+  node AnimGraphNode_RetargetPoseFromMesh_0 class=AnimGraphNode_RetargetPoseFromMesh
+    source mode=parent component
+    retargeter=/Game/Korinsna/RTG_HunToKorinsna.RTG_HunToKorinsna
+
+== meshes
+carrier /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Head_New.Hun_Head_New skeleton=/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton post_bp=/Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C slots=8
+standalone /Game/Korinsna/SK_Korinsna.SK_Korinsna skeleton=/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton post_bp=None slots=8
+== retargeter processor, source = the game mesh the hero uses
+missing asset: source=MISSING target=ok retargeter=ok
+== retargeter processor, source = our own copy of the game mesh
+source HunSkin bones=1171
+target Hun_Head_New bones=369
+processor initialized=true
+source skeleton bones=1171 target skeleton bones=369

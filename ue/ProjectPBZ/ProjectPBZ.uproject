@@ -1,0 +1,22 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.7",
+	"Category": "",
+	"Description": "Korinsna skin mod authoring project for Phantom Blade Zero",
+	"Modules": [
+		{
+			"Name": "ProjectPBZ",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{ "Name": "PythonScriptPlugin", "Enabled": true },
+		{ "Name": "EditorScriptingUtilities", "Enabled": true },
+		{ "Name": "HuaShira", "Enabled": true },
+		{ "Name": "AkashaEffects", "Enabled": true },
+		{ "Name": "ChaosClothAsset", "Enabled": true },
+		{ "Name": "ChaosClothAssetEditor", "Enabled": true },
+		{ "Name": "ChaosCloth", "Enabled": true }
+	]
+}

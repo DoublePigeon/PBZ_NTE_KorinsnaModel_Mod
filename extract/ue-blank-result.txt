@@ -1,0 +1,23 @@
+skeleton = /HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton.Hun_Skin_Skeleton
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Body (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Cloth (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Hair (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Rope01 (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Scarf_Climax (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_BrowLashCardMoQu (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Head (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_UpBody (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_DownBody (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Waistless (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_FrontBelt (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_UpCloth (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_DownCloth (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_FrontCloth (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Cape (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Scarf (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Hair_Band (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_BrowLashCard (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Hat (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked  /HuaShira/Characters/Hero/Hero_Hun/Hats/Hun_Hat_00 (slots=1, bones=275, skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton)
+blanked 20 of 20
+saved /HuaShira/Characters/Hero/Hero_Hun

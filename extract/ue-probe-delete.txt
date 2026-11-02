@@ -1,0 +1,16 @@
+create PKDelete_path_False -> <Object '/Game/Korinsna/PKDelete_path_False.PKDelete_path_False' (0x000001F1E3022800) Class 'IKRigDefinition'> exists=True
+delete_asset(path, False)        -> ERROR delete_asset() takes at most 1 argument (2 given)
+  delete_asset(path, False)    exists=True
+create PKDelete_path_True -> <Object '/Game/Korinsna/PKDelete_path_True.PKDelete_path_True' (0x000001F1E30226C0) Class 'IKRigDefinition'> exists=True
+delete_asset(path, True)         -> ERROR delete_asset() takes at most 1 argument (2 given)
+  delete_asset(path, True)     exists=True
+create PKDelete_asset   -> <Object '/Game/Korinsna/PKDelete_asset.PKDelete_asset' (0x000001F1E3022940) Class 'IKRigDefinition'> exists=True
+delete_loaded_asset(asset)       -> True
+  delete_loaded_asset(asset)   exists=False
+create PKDelete_unloaded -> <Object '/Game/Korinsna/PKDelete_unloaded.PKDelete_unloaded' (0x000001F1E3022940) Class 'IKRigDefinition'> exists=True
+delete_loaded_asset(unloaded)    -> True
+  delete_loaded_asset(unloaded) exists=False
+create PKDelete_rename  -> <Object '/Game/Korinsna/PKDelete_rename.PKDelete_rename' (0x000001F1E3022940) Class 'IKRigDefinition'> exists=True
+rename_asset -> True
+  rename                       exists=False
+  rename(target)               exists=True

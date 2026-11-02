@@ -1,0 +1,9 @@
+source     bones=275   anim=None                               post=None                               animclass=err:'SkeletalMeshComponent' object has no attribute 'get_anim_class' at=err:'SkeletalMeshComponent' object has no attribute 'get_component_location'
+carrier    bones=369   anim=None                               post=ABP_Korinsna_Retarget_C            animclass=err:'SkeletalMeshComponent' object has no attribute 'get_anim_class' at=err:'SkeletalMeshComponent' object has no attribute 'get_component_location'
++animcls   bones=369   anim=ABP_Korinsna_Retarget_C            post=None                               animclass=err:'SkeletalMeshComponent' object has no attribute 'get_anim_class' at=err:'SkeletalMeshComponent' object has no attribute 'get_component_location'
+attach_to_component -> True
++attached  bones=369   anim=ABP_Korinsna_Retarget_C            post=None                               animclass=err:'SkeletalMeshComponent' object has no attribute 'get_anim_class' at=err:'SkeletalMeshComponent' object has no attribute 'get_component_location'
+  Bip001-Pelvis      world=(-0.0, 1.5, 394.7)
+  Bip001-L-Hand      world=(38.5, 6.1, 399.4)
+  head_Bone001       world=(-0.0, 0.3, 443.4)
+carrier skeleton = /Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton

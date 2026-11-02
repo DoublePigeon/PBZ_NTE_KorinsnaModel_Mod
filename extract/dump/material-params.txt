@@ -1,0 +1,115 @@
+slots=8
+slot 0 -> MaterialInstanceConstant /Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/MI_ZeroHun_Cloth_01_b.MI_ZeroHun_Cloth_01_b
+  s0d0  TEX Albedo = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_01_BC.T_ZeroHun_Cloth_01_BC
+  s0d0  TEX Normal = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_01_N.T_ZeroHun_Cloth_01_N
+  s0d0  TEX Mix = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_01_ARM.T_ZeroHun_Cloth_01_ARM
+  s0d0  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Equipment_Mask.MAI_Equipment_Mask
+  s0d1  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/MaterialIcon_Equipment_Mask.MaterialIcon_Equipment_Mask
+  s0d1  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Equipment.MAI_Equipment
+  s0d2  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/MaterialIcon_Equipment.MaterialIcon_Equipment
+  s0d2  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Character.MAI_Character
+  s0d3  (none)
+  s0d3  PARENT Material /AkashaEffects/MaterialLibrary/Material/MA_Character.MA_Character
+slot 1 -> MaterialInstanceConstant /Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/MI_ZeroHun_Cloth_02_b.MI_ZeroHun_Cloth_02_b
+  s1d0  TEX Albedo = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_02_BC.T_ZeroHun_Cloth_02_BC
+  s1d0  TEX Normal = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_02_N.T_ZeroHun_Cloth_02_N
+  s1d0  TEX Mix = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_02_ARM.T_ZeroHun_Cloth_02_ARM
+  s1d0  TEX DetailColor = Texture2D /AkashaEffects/MaterialLibrary/Texture/Noises/T_Fabric_C.T_Fabric_C
+  s1d0  TEX DetailNormal (NonVT) = Texture2D /AkashaEffects/MaterialLibrary/Texture/Noises/T_Fabric_N.T_Fabric_N
+  s1d0  TEX DetailNormal(VT) = Texture2D /AkashaEffects/MaterialLibrary/Texture/Noises/T_Fabric_N.T_Fabric_N
+  s1d0  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Cloth.MAI_Cloth
+  s1d1  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/GreyPlaceholder_VT.GreyPlaceholder_VT
+  s1d1  TEX Albedo_T = Texture2D /AkashaEffects/MaterialLibrary/Texture/GreyPlaceholder.GreyPlaceholder
+  s1d1  TEX OpacityMask = Texture2D /Engine/Functions/Engine_MaterialFunctions02/ExampleContent/Plane002AlphaMap.Plane002AlphaMap
+  s1d1  TEX Normal = Texture2D /AkashaEffects/MaterialLibrary/Texture/Placeholder_Normal_VT.Placeholder_Normal_VT
+  s1d1  TEX Mix = Texture2D /AkashaEffects/MaterialLibrary/Texture/Placeholder_Mask_VT.Placeholder_Mask_VT
+  s1d1  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Character.MAI_Character
+  s1d2  (none)
+  s1d2  PARENT Material /AkashaEffects/MaterialLibrary/Material/MA_Character.MA_Character
+  s1d3  (none)
+  s1d3  PARENT <nofn>
+slot 2 -> MaterialInstanceConstant /Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/MI_ZeroHun_Cloth_03_b.MI_ZeroHun_Cloth_03_b
+  s2d0  TEX Albedo = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_03_BC.T_ZeroHun_Cloth_03_BC
+  s2d0  TEX Normal = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_03_N.T_ZeroHun_Cloth_03_N
+  s2d0  TEX Mix = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_03_ARM.T_ZeroHun_Cloth_03_ARM
+  s2d0  TEX MaskTex = Texture2D /PBZVFXPack/VFX/A_DebugAssets/FX_T_BlankWhite_001.FX_T_BlankWhite_001
+  s2d0  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Equipment.MAI_Equipment
+  s2d1  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/MaterialIcon_Equipment.MaterialIcon_Equipment
+  s2d1  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Character.MAI_Character
+  s2d2  (none)
+  s2d2  PARENT Material /AkashaEffects/MaterialLibrary/Material/MA_Character.MA_Character
+  s2d3  (none)
+  s2d3  PARENT <nofn>
+slot 3 -> MaterialInstanceConstant /Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/MI_ZeroHun_Cloth_04_b.MI_ZeroHun_Cloth_04_b
+  s3d0  TEX Albedo = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_04_BC.T_ZeroHun_Cloth_04_BC
+  s3d0  TEX Normal = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_04_N.T_ZeroHun_Cloth_04_N
+  s3d0  TEX Mix = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_04_ARM.T_ZeroHun_Cloth_04_ARM
+  s3d0  TEX DetailColor = Texture2D /AkashaEffects/MaterialLibrary/Texture/Noises/T_Fabric_C.T_Fabric_C
+  s3d0  TEX DetailNormal (NonVT) = Texture2D /AkashaEffects/MaterialLibrary/Texture/Noises/T_Fabric_N.T_Fabric_N
+  s3d0  TEX DetailNormal(VT) = Texture2D /AkashaEffects/MaterialLibrary/Texture/Noises/T_Fabric_N.T_Fabric_N
+  s3d0  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Cloth.MAI_Cloth
+  s3d1  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/GreyPlaceholder_VT.GreyPlaceholder_VT
+  s3d1  TEX Albedo_T = Texture2D /AkashaEffects/MaterialLibrary/Texture/GreyPlaceholder.GreyPlaceholder
+  s3d1  TEX OpacityMask = Texture2D /Engine/Functions/Engine_MaterialFunctions02/ExampleContent/Plane002AlphaMap.Plane002AlphaMap
+  s3d1  TEX Normal = Texture2D /AkashaEffects/MaterialLibrary/Texture/Placeholder_Normal_VT.Placeholder_Normal_VT
+  s3d1  TEX Mix = Texture2D /AkashaEffects/MaterialLibrary/Texture/Placeholder_Mask_VT.Placeholder_Mask_VT
+  s3d1  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Character.MAI_Character
+  s3d2  (none)
+  s3d2  PARENT Material /AkashaEffects/MaterialLibrary/Material/MA_Character.MA_Character
+  s3d3  (none)
+  s3d3  PARENT <nofn>
+slot 4 -> MaterialInstanceConstant /Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/MI_ZeroHun_Cloth_05_b.MI_ZeroHun_Cloth_05_b
+  s4d0  TEX Albedo = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_05_BC.T_ZeroHun_Cloth_05_BC
+  s4d0  TEX Normal = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_05_N.T_ZeroHun_Cloth_05_N
+  s4d0  TEX Mix = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_05_ARM.T_ZeroHun_Cloth_05_ARM
+  s4d0  TEX DetailNormal (NonVT) = Texture2D /AkashaEffects/MaterialLibrary/Texture/Noises/T_Fabric_N.T_Fabric_N
+  s4d0  TEX DetailNormal(VT) = Texture2D /AkashaEffects/MaterialLibrary/Texture/Placeholder_Normal_VT.Placeholder_Normal_VT
+  s4d0  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Cloth.MAI_Cloth
+  s4d1  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/GreyPlaceholder_VT.GreyPlaceholder_VT
+  s4d1  TEX Albedo_T = Texture2D /AkashaEffects/MaterialLibrary/Texture/GreyPlaceholder.GreyPlaceholder
+  s4d1  TEX OpacityMask = Texture2D /Engine/Functions/Engine_MaterialFunctions02/ExampleContent/Plane002AlphaMap.Plane002AlphaMap
+  s4d1  TEX Normal = Texture2D /AkashaEffects/MaterialLibrary/Texture/Placeholder_Normal_VT.Placeholder_Normal_VT
+  s4d1  TEX Mix = Texture2D /AkashaEffects/MaterialLibrary/Texture/Placeholder_Mask_VT.Placeholder_Mask_VT
+  s4d1  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Character.MAI_Character
+  s4d2  (none)
+  s4d2  PARENT Material /AkashaEffects/MaterialLibrary/Material/MA_Character.MA_Character
+  s4d3  (none)
+  s4d3  PARENT <nofn>
+slot 5 -> MaterialInstanceConstant /Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/MI_ZeroHun_Cap_01_b.MI_ZeroHun_Cap_01_b
+  s5d0  TEX Albedo = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cap_V02_BC.T_ZeroHun_Cap_V02_BC
+  s5d0  TEX Normal = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cap_V02_N.T_ZeroHun_Cap_V02_N
+  s5d0  TEX Mix = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cap_V02_ARM.T_ZeroHun_Cap_V02_ARM
+  s5d0  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Equipment_Mask.MAI_Equipment_Mask
+  s5d1  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/MaterialIcon_Equipment_Mask.MaterialIcon_Equipment_Mask
+  s5d1  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Equipment.MAI_Equipment
+  s5d2  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/MaterialIcon_Equipment.MaterialIcon_Equipment
+  s5d2  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Character.MAI_Character
+  s5d3  (none)
+  s5d3  PARENT Material /AkashaEffects/MaterialLibrary/Material/MA_Character.MA_Character
+slot 6 -> MaterialInstanceConstant /Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/Hun_Status/MI_ZeroHun_Head_Injured30.MI_ZeroHun_Head_Injured30
+  s6d0  TEX BaseColor = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/HeadMerged/T_ZeroHun_Head_D.T_ZeroHun_Head_D
+  s6d0  TEX Normal = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/HeadMerged/T_ZeroHun_Head_N.T_ZeroHun_Head_N
+  s6d0  TEX SCMT_Map = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Head_V02_SCMT.T_ZeroHun_Head_V02_SCMT
+  s6d0  TEX SkinNormal_MICRO = Texture2D /Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Head_Detail_N.T_ZeroHun_Head_Detail_N
+  s6d0  TEX Dirt_MaskMap = Texture2D /Game/Test/Zero_LookDev/ZeroFile/Character/Hun/Head/Textures/T_ZeroHun_Head_DirtMask.T_ZeroHun_Head_DirtMask
+  s6d0  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Skin.MAI_Skin
+  s6d1  TEX Albedo = Texture2D /AkashaEffects/MaterialLibrary/Texture/MaterialIcon_Skin.MaterialIcon_Skin
+  s6d1  PARENT MaterialInstanceConstant /AkashaEffects/MaterialLibrary/Template/Character/MAI_Character.MAI_Character
+  s6d2  (none)
+  s6d2  PARENT Material /AkashaEffects/MaterialLibrary/Material/MA_Character.MA_Character
+  s6d3  (none)
+  s6d3  PARENT <nofn>
+slot 7 -> MaterialInstanceConstant /Game/PBZContent/Characters/Hero/Hun_New_V2/Material/MI_ZeroHun_Eye_01.MI_ZeroHun_Eye_01
+  s7d0  TEX IrisAO = Texture2D /Game/Test/Zero_LookDev/ZeroFile/Character/Hun/Head/Textures/T_ZeroHun_Eye_AO.T_ZeroHun_Eye_AO
+  s7d0  TEX IrisBaseColor = Texture2D /Game/Test/Zero_LookDev/ZeroFile/Character/Hun/Head/Textures/T_ZeroHun_Eye_D.T_ZeroHun_Eye_D
+  s7d0  TEX IrisHeight = Texture2D /Game/Test/Zero_LookDev/ZeroFile/Character/Hun/Head/Textures/T_ZeroHun_Eye_H.T_ZeroHun_Eye_H
+  s7d0  TEX ScleraBaseColor = Texture2D /Game/Test/Zero_LookDev/SampleMetaHumans/Common/Face/LookDev/Materials/Eye/Textures/T_EyeSclera_D.T_EyeSclera_D
+  s7d0  TEX ScleraNormal = Texture2D /Game/Test/Zero_LookDev/SampleMetaHumans/Common/Face/LookDev/Materials/Eye/Textures/T_EyeSclera_N.T_EyeSclera_N
+  s7d0  PARENT Material /AkashaEffects/MaterialLibrary/Material/CharacterMaterials/MA_EyeRefractive_02.MA_EyeRefractive_02
+  s7d1  (none)
+  s7d1  PARENT <nofn>
+  s7d2  (none)
+  s7d2  PARENT <nofn>
+  s7d3  (none)
+  s7d3  PARENT <nofn>
+end

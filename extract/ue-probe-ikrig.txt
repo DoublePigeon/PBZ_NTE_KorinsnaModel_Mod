@@ -1,0 +1,20 @@
+has IKRigDefinition: True
+has IKRigDefinitionFactory: True
+has IKRetargeter: True
+has IKRetargetFactory: True
+has KorinsnaEditorLibrary: True
+unreal.IKRigDefinitionFactory()          -> <Object '/Engine/Transient.IKRigDefinitionFactory_0' (0x0000027CE2B18D40) Class 'IKRigDefinitionFactory'>
+factory usable: <Object '/Engine/Transient.IKRigDefinitionFactory_0' (0x0000027CE2B18D40) Class 'IKRigDefinitionFactory'>
+create_asset(IKRigDefinition)            -> <Object '/Game/Korinsna/ProbeIKR.ProbeIKR' (0x0000027CE32D1A40) Class 'IKRigDefinition'>
+exists after create: True
+IKRigController.get_controller           -> <Object '/Engine/Transient.IKRigController_0' (0x0000027CE32D1900) Class 'IKRigController'>
+controller: <Object '/Engine/Transient.IKRigController_0' (0x0000027CE32D1900) Class 'IKRigController'>
+target mesh: <Object '/Game/Korinsna/SK_Korinsna.SK_Korinsna' (0x0000027CE32A8C00) Class 'SkeletalMesh'>
+set_skeletal_mesh                        -> True
+set_retarget_root                        -> True
+add_retarget_chain                       -> Name("Head")
+chains: ['Head']
+save                                     -> True
+unreal.IKRetargetFactory()               -> <Object '/Engine/Transient.IKRetargetFactory_0' (0x0000027CE2B1C760) Class 'IKRetargetFactory'>
+create_asset(IKRetargeter)               -> <Object '/Game/Korinsna/ProbeRTG.ProbeRTG' (0x0000027CE37F1C00) Class 'IKRetargeter'>
+rtg exists: True  asset=<Object '/Game/Korinsna/ProbeRTG.ProbeRTG' (0x0000027CE37F1C00) Class 'IKRetargeter'>

@@ -1,0 +1,18 @@
+korinsna skeletal mesh import
+asset=/Game/Korinsna/SK_Korinsna
+skeleton=/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton
+bones=369
+materials=8
+bounds origin (-0.20, -7.49, 86.88) extent (42.56, 30.58, 86.84)
+bounds min z = 0.04  max z = 173.72
+  Root               [0.0, 0.0, 0.0]
+  Bip001-Pelvis      [-0.0, 1.5008, 94.7244]
+  Bip001-Spine       [0.0, 3.7016, 103.3255]
+  Bip001-Spine1      [-0.0002, 3.6944, 111.5856]
+  Bip001-Neck        [-0.0008, -0.5569, 137.8899]
+  head_Bone001       [-0.001, 0.3149, 143.37]
+  Bip001-L-Hand      [37.6836, 11.1787, 99.8308]
+  Bip001-R-Hand      [-38.207, 11.7091, 100.3555]
+  Bip001-L-Foot      [12.6001, -4.7625, 12.9637]
+  Bip001-R-Foot      [-12.5357, -4.7622, 12.9607]
+  Bip001-L-Toe0      [14.7757, 3.813, 4.1929]

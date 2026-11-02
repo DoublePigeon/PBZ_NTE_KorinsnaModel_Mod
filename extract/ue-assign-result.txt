@@ -1,0 +1,11 @@
+existing slots: 8 (['Korinsna_00', 'Korinsna_01', 'Korinsna_02', 'Korinsna_03', 'Korinsna_04', 'Korinsna_05', 'Korinsna_06', 'Korinsna_07'])
+new slots: 8
+  [0] Korinsna_00 -> /Game/Korinsna/Materials/MI_Korinsna_Cloth01.MI_Korinsna_Cloth01
+  [1] Korinsna_01 -> /Game/Korinsna/Materials/MI_Korinsna_Cloth02.MI_Korinsna_Cloth02
+  [2] Korinsna_02 -> /Game/Korinsna/Materials/MI_Korinsna_Hair01.MI_Korinsna_Hair01
+  [3] Korinsna_03 -> /Game/Korinsna/Materials/MI_Korinsna_Hair02.MI_Korinsna_Hair02
+  [4] Korinsna_04 -> /Game/Korinsna/Materials/MI_Korinsna_Face.MI_Korinsna_Face
+  [5] Korinsna_05 -> /Game/Korinsna/Materials/MI_Korinsna_Eyebrow.MI_Korinsna_Eyebrow
+  [6] Korinsna_06 -> /Game/Korinsna/Materials/MI_Korinsna_Eye.MI_Korinsna_Eye
+  [7] Korinsna_07 -> /Game/Korinsna/Materials/MI_Korinsna_Emit.MI_Korinsna_Emit
+done

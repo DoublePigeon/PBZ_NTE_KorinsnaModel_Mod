@@ -1,0 +1,70 @@
+/Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_01_BC
+    srgb                       = True
+    compression_settings       = <TextureCompressionSettings.TC_DEFAULT: 0>
+    lod_group                  = <TextureGroup.TEXTUREGROUP_WORLD: 0>
+    virtual_texture_streaming  = True
+    never_stream               = False
+    filter                     = <TextureFilter.TF_DEFAULT: 3>
+    address_x                  = <TextureAddress.TA_WRAP: 0>
+    address_y                  = <TextureAddress.TA_WRAP: 0>
+    mip_gen_settings           = <TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP: 0>
+/Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_03_BC
+    srgb                       = True
+    compression_settings       = <TextureCompressionSettings.TC_DEFAULT: 0>
+    lod_group                  = <TextureGroup.TEXTUREGROUP_WORLD: 0>
+    virtual_texture_streaming  = True
+    never_stream               = False
+    filter                     = <TextureFilter.TF_DEFAULT: 3>
+    address_x                  = <TextureAddress.TA_WRAP: 0>
+    address_y                  = <TextureAddress.TA_WRAP: 0>
+    mip_gen_settings           = <TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP: 0>
+/Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_05_BC
+    srgb                       = True
+    compression_settings       = <TextureCompressionSettings.TC_DEFAULT: 0>
+    lod_group                  = <TextureGroup.TEXTUREGROUP_WORLD: 0>
+    virtual_texture_streaming  = True
+    never_stream               = False
+    filter                     = <TextureFilter.TF_DEFAULT: 3>
+    address_x                  = <TextureAddress.TA_WRAP: 0>
+    address_y                  = <TextureAddress.TA_WRAP: 0>
+    mip_gen_settings           = <TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP: 0>
+/Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_01_N
+    srgb                       = False
+    compression_settings       = <TextureCompressionSettings.TC_NORMALMAP: 1>
+    lod_group                  = <TextureGroup.TEXTUREGROUP_WORLD_NORMAL_MAP: 1>
+    virtual_texture_streaming  = False
+    never_stream               = False
+    filter                     = <TextureFilter.TF_DEFAULT: 3>
+    address_x                  = <TextureAddress.TA_WRAP: 0>
+    address_y                  = <TextureAddress.TA_WRAP: 0>
+    mip_gen_settings           = <TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP: 0>
+/Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/T_ZeroHun_Cloth_01_ARM
+    srgb                       = True
+    compression_settings       = <TextureCompressionSettings.TC_DEFAULT: 0>
+    lod_group                  = <TextureGroup.TEXTUREGROUP_WORLD: 0>
+    virtual_texture_streaming  = False
+    never_stream               = False
+    filter                     = <TextureFilter.TF_DEFAULT: 3>
+    address_x                  = <TextureAddress.TA_WRAP: 0>
+    address_y                  = <TextureAddress.TA_WRAP: 0>
+    mip_gen_settings           = <TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP: 0>
+/Game/PBZContent/Characters/Hero/Hun_New_V2b/Textures/HeadMerged/T_ZeroHun_Head_D
+    srgb                       = True
+    compression_settings       = <TextureCompressionSettings.TC_DEFAULT: 0>
+    lod_group                  = <TextureGroup.TEXTUREGROUP_WORLD: 0>
+    virtual_texture_streaming  = False
+    never_stream               = False
+    filter                     = <TextureFilter.TF_DEFAULT: 3>
+    address_x                  = <TextureAddress.TA_WRAP: 0>
+    address_y                  = <TextureAddress.TA_WRAP: 0>
+    mip_gen_settings           = <TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP: 0>
+/Game/Test/Zero_LookDev/ZeroFile/Character/Hun/Head/Textures/T_ZeroHun_Eye_D
+    srgb                       = True
+    compression_settings       = <TextureCompressionSettings.TC_DEFAULT: 0>
+    lod_group                  = <TextureGroup.TEXTUREGROUP_WORLD: 0>
+    virtual_texture_streaming  = False
+    never_stream               = False
+    filter                     = <TextureFilter.TF_DEFAULT: 3>
+    address_x                  = <TextureAddress.TA_WRAP: 0>
+    address_y                  = <TextureAddress.TA_WRAP: 0>
+    mip_gen_settings           = <TextureMipGenSettings.TMGS_FROM_TEXTURE_GROUP: 0>

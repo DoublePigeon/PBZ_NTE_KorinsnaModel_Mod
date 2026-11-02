@@ -1,0 +1,2 @@
+/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton       Skeleton       bones=1171  skeleton=None
+/HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Body_Simple SkeletalMesh   bones=275   skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton.Hun_Skin_Skeleton

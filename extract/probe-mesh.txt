@@ -1,0 +1,3 @@
+mesh skeleton=/HuaShira/Characters/Hero/Hero_Hun/Hun_Skin_Skeleton.Hun_Skin_Skeleton
+skel bones=275
+bone walk failed: 'Array' object has no attribute 'get_editor_property'

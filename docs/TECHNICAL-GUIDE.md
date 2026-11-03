@@ -109,6 +109,7 @@ Lua 侧随后只要 `StaticFindObject("/Game/Korinsna/ABP_Korinsna_Retarget.ABP_
 | [tools/build_all.ps1](../tools/build_all.ps1) / [stage_iostore.ps1](../tools/stage_iostore.ps1) / [install_mod.ps1](../tools/install_mod.ps1) | 总装 / 裁剪+staging / 安装 |
 | [tools/make_neutral_textures.py](../tools/make_neutral_textures.py) | 生成中性辅助贴图（注意 §6.8 的通道顺序坑） |
 | [tools/luacheck.py](../tools/luacheck.py) | Lua 静态语法检查（lupa） |
+| [tools/check_forward_refs.py](../tools/check_forward_refs.py) | 检测「先调用后声明」的 `local function`（见 §6.20） |
 
 ### 3.1 为什么必须「原生 5.7 cook + UAT staging」
 
@@ -258,6 +259,52 @@ IK Retargeter 的旋转模式是**链级**设置，**没有逐骨轴向限制**�
 
 第 4 步的数据依据：我们手骨长度只有 4.36cm、近节指骨距手骨 6.0~6.5cm，而魂的握点在手骨外
 9.5cm——正好落在「第一指节外表面」。`grip_distance = { r = 6.0, l = 6.0 }` 是实机调出来的值。
+
+#### 5.8.1 收起（挂在背后）的武器：搬到 Korinsna 的脊柱上
+
+**现象**：掏出武器时位置正确，但**收刀之后武器乱飘**。
+
+**排查**（`report_weapon_chain` 打印每次挂接链变化 + Root 到它自称 socket 的距离）：
+
+```
+weapon chain: Hun_DoubleBlade_R  Weapon Mesh <- Root/Pt_DoubleBlade_R_Back_Socket <- CharacterMesh0 ... | root gap to socket 0.0 cm
+```
+
+Root **精确**回到了游戏自己的背后 socket（gap 0.0cm）。所以不是绑定错位，而是**那个 socket 长在隐藏的
+魂的身体上**：魂肩宽、袍厚，这个点在可琳思娜身上落在身体外面 —— 和当初腰后短刀穿裙子是同一类问题
+（§5.10）。
+
+**修法**（`anchor_sheathed_weapon`，`config.sheathed_*`）：非手部挂点的武器不再留在魂的 socket 上，
+改为搬到**我们自己的躯干**：
+
+1. `K2_AttachToComponent(carrier, Bip001-Spine, KeepWorld×3)`；
+2. 平移 `我们的脊柱 − 魂的 spine_03`，保留游戏给的世界旋转；
+3. 再沿裙子**背面方向**外推 `sheathed_push_cm`（2cm，与腰后短刀同一套方向推导）。
+
+**为什么是脊柱而不是骨盆**：先试过 `Bip001-Pelvis`（和腰后短刀一致），实机看起来武器**跟着屁股动**——
+髋部在走路时摆幅远大于胸腔，背上的武器跟着晃很怪。重定向链是 `pelvis→spine_05` ↔
+`Bip001-Pelvis→Bip001-Spine1`，所以可琳思娜的中间脊柱 `Bip001-Spine` 对应魂的 `spine_03`。
+
+**注意**：`Hun_Knife` / `Hun_Knife_Scabbard`（§5.10 的 `back_items`）**保持骨盆锚定不变**，
+它们本来就该在腰臀附近。
+
+#### 5.8.2 姿势看门狗重建之后，武器要「退回 socket 再重挂」
+
+看门狗（§6.17）重建重定向图时，手骨可能还是**参考姿势**；武器那时仍挂在我们手骨上，
+它的相对变换就按错误的手骨算了出来 → 恢复后**刀刃朝向是歪的**，切一次武器才正常
+（切换会走一次完整锚定）。
+
+修法：
+
+- `rearm_pose()` 置 `state.weapon_reanchor`；
+- `anchor_held_weapons` 在**姿势真的动起来之后**（我们的手部向量变化 >0.5cm）才把武器
+  `K2_AttachToComponent(source, 原 socket, SnapToTarget×3)` 退回游戏 socket，
+  下一轮由正常流程在正确姿势下重算偏移；
+- 同时加安全线 `anchor_max_gap_cm`（100cm）：双手间距超过一米**不可能是真实姿势**，
+  这时本轮不锚定（否则会把坏偏移烘进武器；实测那样会出现 `hand gap 182.7 cm` 的锚定）。
+
+日志里能看到 `weapon: X returned to '<socket>' for a fresh anchor` 与随后的
+`weapon: X on <socket> -> Bip001-R-Hand | hand gap …`。
 
 ### 5.9 为什么不用手部 IK
 
@@ -439,14 +486,33 @@ IK 的隐含前提是「我们的手能够到魂的手」。实测两手间距�
 post-process 重定向图也就不跑，网格回落到**参考姿势**（看着就是「默认姿势」）。
 脚本只在「首次见到该组件」时清过一次 leader pose（每轮清会让姿势卡在第一帧），之后再也不清。
 
-**修法：姿势看门狗（`watch_pose`，每轮扫描）**
+**修法：姿势看门狗（`watch_pose`，每轮扫描）**——经过四轮实机迭代才做对，下面记录每一步的**测量教训**：
 
-- 同时采样原身体与我们的「骨盆→右手」向量（组件空间，走路不影响判定）；
-- 原身体在动（> `pose_move_threshold` cm）而我们的向量不动（< `pose_stuck_threshold` cm）
-  连续 `pose_stuck_scans` 次 → 判定卡住；
-- 补一次 `SetLeaderPoseComponent(nil, true, true)` + `SetEnableAnimation(true)` +
-  `SetDisablePostProcessBlueprint(false)`，并打印当时的 anim / animclass / post 实例名；
-  之后有 `pose_heal_cooldown` 冷却，避免变成重置循环。
+| 尝试 | 结果 | 原因 |
+| --- | --- | --- |
+| 每轮清一次 leader pose | 姿势卡在第一帧 | 重复 `SetLeaderPoseComponent` 会重新初始化姿势 |
+| 单帧阈值（原身体 >1cm 且我们 <0.05cm，连续 4 次） | 几乎不触发 | 待机动作每 0.5 秒只有几毫米 |
+| 世界坐标 + 累计窗口 | 完全不触发 | **角色转身被当成在动**：冻结期间向量 Z 恒为 5.6，X/Y 却绕圈摆动、幅度恒 ~45cm |
+| 组件空间 + 滑动窗口 + 丢弃坏读数 | ✅ 2 秒内恢复 | 见下 |
+
+最终实现：
+
+1. **姿态向量用组件空间**（`bone_component`）算「骨盆→右手」；世界坐标会把角色朝向的变化算成姿势变化。
+   `GetBoneTransform` 在本作里偶发返回**零值**，长度不在 5~200cm 的读数**直接丢弃**（视为「无信息」，
+   这一轮不参与判定，既不算动也不算停）。
+2. **每轮分类**：原身体位移 > `pose_step_move_cm`(0.5) 且我们 < `pose_step_stuck_cm`(0.3) → 记一次「停滞」。
+3. **滑动窗口判决**：最近 `pose_slip_window`(12) 轮里「停滞」≥ `pose_stuck_marks`(4) 次 → 约 2 秒即判定。
+   用计数而不是「连续」，是因为一次坏读数就会把连续计数清零（实测因此丢了 17 秒）。
+4. **重建**：`SetLeaderPoseComponent(nil,true,true)` + `SetEnableAnimation(true)` +
+   `SetDisablePostProcessBlueprint(false)`；连续两次判定失败时**升级**——toggle
+   `DisablePostProcessBlueprint` 强制重建 post-process 实例 + `MarkRenderStateDirty()`。
+5. 附加的**最快信号**：每轮读 `GetPostProcessInstance()`，一旦为 nil（重定向图被拆掉）立刻重建，不等窗口。
+6. 冷却 `pose_heal_cooldown`(6 轮) 防止变成重置循环。
+
+重建之后还必须处理武器（§5.8.2），否则刀刃朝向会歪。
+
+> 调试开关：`report_pose_window`（每 5 轮打印 `pose window: N/12 stalled … | src … move … | ours … move …`）。
+> 这三轮实机定位全靠它——没有它只能靠猜。
 
 ### 6.18 衣服颜色发白 / 像褪色（真正的元凶：游戏换掉了槽 0 的材质）
 
@@ -491,6 +557,122 @@ material_guard = {
   （每个实例只有一个 albedo 路径）。
 - 以后如果发现别的槽也被换掉（例如重伤时），往 `material_guard` 里加一条即可。
 
+### 6.19 过场 / 预览里的原主角（衣服、靴子、乃至「蓬松丝线」）
+
+**现象**：过场动画里出现**两个模型**——可琳思娜 + 原主角（含靴子）；有时还能看到一团蓬松丝线/头发。
+
+**根因（分两层）**：
+
+1. **过场用的是主角的副本 Actor**，不是玩家自己：日志里是 `BP_Seq_Hun_C` / `BP_Seq_Hun_Climax_C`，
+   菜单外观预览是 `BP_PreviewAppearance_Hun_C`。这些副本带着**同一批部件资产**，而其中
+   `Hun_Body_Simple` 是本 mod 唯一**没有在资产层替换**的网格（它是重定向的姿势来源，只能运行时隐藏，
+   见 §5.11 / §6.11）。玩家自己的那份被隐藏了，副本没有 → 原版衣服回来了。
+   那团「丝线」就是这份原主角模型的残留，不是 Chaos Cloth（四个 `CA_Hun_*` 组件当时已经全部命中隐藏）。
+2. **脚本一度把过场副本当成了玩家**：日志
+   `hero body: ... BP_Seq_Hun_Climax_C_1.CharacterMesh0` —— 在**序章地图**里玩家是幼年主角
+   `BP_Renewal_Hun_Young_C`，玩家自己的 Actor 上没有我们的承载网格，于是脚本采纳了过场副本；
+   之后「副本清理」又因为「它是玩家」而跳过它，正好绕过要清理的对象。
+
+**修法**（`sweep_other_heroes` + `sweep` 家族函数）：
+
+- **采纳规则**：只排除名字含 `BP_Seq_` / `Preview` 的 Actor；已有 Actor 有效时不会被新 Actor 抢走
+  （除非新的是玩家 Pawn）。
+- **清理范围**：凡 owner 名字含 `Hun`、不含 `Young`、且不是玩家 Pawn 的 Actor，其**除承载网格
+  `Hun_Head_New` 与武器之外的所有组件**都隐藏（骨骼网格 / 静态网格 / `ChaosClothComponent` /
+  `GroomComponent` / `Budgeted`）。命中过的类名 + 资源名会写进日志一次。
+- **副本的身体要保活**：`AlwaysTickPoseAndRefreshBones` + 关 URO 后再隐藏，否则副本里的
+  Korinsna 网格（它是 leader pose 跟随者）没有姿势可重定向；并给副本的承载网格清一次 leader pose。
+- **幼年主角**（`Hun_Young_*`）全程不碰——我们还没替换那个模型。
+- 清理**不依赖 retarget 是否建立**（在 `scan()` 里每轮调用）：序章里脚本本身不接管，
+  但那里的成年副本一样要清。
+
+**性能坑（重要）**：第一版把这些扫描放在**每 0.5 秒**跑，遍历 5 类组件（真实关卡上千个
+StaticMesh），加上打开着 `report_weapon_chain`（每变化一次就拼整条挂接链字符串）——结果
+**明显一顿一顿掉帧**。现在：
+
+- 组件列表**事件驱动重建**：`NotifyOnNewObject` 发现英雄副本的新组件 → 置 `copy_dirty`；
+  另外 `copy_rescan_scans`(60 轮 ≈ 30 秒) 兜底；
+- 每轮只对**缓存里的那几十个组件**重新套隐藏（必需，衣柜/序列系统会重新打开它们）；
+- 排查用的 `report_weapon_chain` / `report_materials` 默认关闭。
+
+### 6.20 「先调用后声明」：Lua `local function` 只能从定义行起可见
+
+这次实机排查踩到一个纯 Lua 的坑，代价很大：`is_hero_copy` 定义在 `hero_owned` 之后，
+却被更早的 `hide_copy_bodies` 调用。`local function` 的可见性**从定义行开始**，于是那次调用
+解析成了全局 `is_hero_copy`（nil），日志是
+
+```
+scan error: main.lua:1749: attempt to call a nil value (global 'is_hero_copy')
+```
+
+——**整个清理流程根本没跑**，表现出来却是「过场里两个模型还在」，很容易被误判成逻辑问题。
+更糟的是我第一次修的时候只把两个函数互换，仍然让 `hide_copy_bodies` 早于 `player_pawn_name`。
+
+因此新增静态检查 [tools/check_forward_refs.py](../tools/check_forward_refs.py)：
+收集所有 `local function` / `local x =` 的行号，再标出**早于声明行的同名调用**。
+每次改完 Lua 都要跑：
+
+```powershell
+python tools\luacheck.py          # 语法
+python tools\check_forward_refs.py  # 先调用后声明
+```
+
+### 6.21 过场里衣服又褪色了（副本的材质槽没人守）
+
+**现象**：正常游玩时裙子是红的，但**一进过场**就变回褪色的样子。
+
+**根因**：§6.18 的材质守卫只作用在**玩家自己**的承载组件上（`guard_materials(target)`）。
+过场副本身上也有一份同名网格（`Hun_Head_New`，资产覆盖的必然结果），游戏的受伤 / 状态系统同样会把它的
+槽 0 换成 `Hun_Status/MI_ZeroHun_Head_Injured*`，而副本从来没被守过。
+
+日志证据（`copy material:` 前缀是本轮新加的）：
+
+```
+copy material: slot 0 was MID_MI_ZeroHun_Head_Injured30_2147468964 -> restored MI_ZeroHun_Cloth_04_b (ok)
+copy material: slot 0 was <none> -> restored MI_ZeroHun_Cloth_04_b (ok)
+```
+
+（`<none>` 的行说明副本的槽 0 甚至是空的——不守的话那块布料直接不显示。）
+
+**修法**：`apply_copy_hiding` 里对每个副本承载网格调同一个 `guard_materials(obj, "copy material")`，
+`guard_materials` 增加了一个 `label` 参数用于区分日志来源。
+
+### 6.22 过场里偶发崩溃（缓存里握着已经销毁的组件）
+
+**现象**：过场动画过程中偶尔崩溃，崩点不固定。
+
+**证据**：dump 里崩溃类型是 `0xc0000005`，故障地址 `PBZ.exe+0x144d2d0` —— **与 §6.16 修掉的「传送崩溃」
+完全相同**（`tools/dump_crash.py` 一行就能确认）。§6.16 那次的原因是「对已经销毁的组件调引擎函数」，
+这次是同一类问题的另一条路径。
+
+**根因**：§6.19 的副本清理为了避掉帧把组件列表**缓存**了下来（`state.copy_list` 最多 72 项、
+`state.cloth_list`、`state.copy_carriers`、`state.quiet_parts`），缓存的是 **UObject 引用**。
+过场里副本 Actor 被不停创建/销毁，其中一个被销毁之后，下一轮扫描仍会拿着旧引用调
+`SetVisibility` / `SetCastShadow` / 反射写——解引用已释放内存 → 崩在游戏自己的代码里。
+
+**修法：缓存只存对象名，用前重新解析**
+
+```lua
+local function resolve_component(key)   -- 名字 -> 活对象；解析不到就返回 nil
+    local found = try("StaticFindObject", function() return StaticFindObject(key) end)
+    found = usable(found)
+    if found == nil or full_name(found) ~= key then return nil end
+    return found
+end
+```
+
+- 所有跨扫描缓存（副本部件、副本承载网格、Chaos Cloth、主角空白部件）都改成**名字**；
+  每轮 touch 前 `resolve_component`，解析不到就跳过并把列表标脏（下轮重建）。
+- **为什么这样是安全的**：扫描跑在游戏线程上，同一轮内对象不会被销毁，所以
+  「解析成功 → 立刻调用」之间不存在竞态；危险只存在于**跨轮**持有的旧引用。
+- 顺带去掉副本上的反射写入 `bCastHiddenShadow`（`Reflection():ImportText()` 是这类崩溃最危险的调用，
+  而阴影已由每次的 `SetCastShadow(false)` 覆盖）。
+- 副本列表重建（全关卡扫描）加最小间隔 `copy_rescan_min_scans`（4 轮 ≈ 2 秒）：
+  过场里组件是连续生成的，否则「有新组件就重建」等于每轮全扫一次。
+
+**教训**：UE4SS 的 Lua 包装**不会**让 UObject 保活，也不保证读写已释放内存时表现为安全失败——
+`valid()`（内部是 `IsValid()`）对悬垂指针同样不可靠。凡是跨扫描保存的东西，存名字。
+
 ---
 
 ## 7. 运行期脚本（`ue4ss/KorinsnaRetarget`）
@@ -507,16 +689,26 @@ material_guard = {
 | `hide_scabbards` | `true` | 隐藏会乱飞的刀鞘（`back_items` 除外） |
 | `quiet_blank_parts` | `true` | 空白部件移出阴影/主通道（**只处理主角自己的组件**，见 §6.15） |
 | `carrier_cast_shadow` | `false` | 承载网格不投影（避免黑斑） |
-| `attach_weapons` | `true` | 把手持武器 Actor 对齐到我们的手骨 |
+| `attach_weapons` | `true` | 把手持武器 Actor 对齐到我们的手骨（§5.8） |
 | `grip_distance` | `{ r=6.0, l=6.0 }` | 握点距手骨的距离（cm），0 = 保持游戏值 |
-| `back_items` / `back_item_push_cm` | `Hun_Knife` + 刀鞘 / `2.0` | 腰后短刀锚到骨盆并外推 |
-| `pose_watchdog` | `true` | 姿势卡住（游戏重设 leader pose）时补清一次，见 §6.17 |
-| `pose_stuck_scans` / `pose_move_threshold` / `pose_stuck_threshold` / `pose_heal_cooldown` | `4` / `1.0` / `0.05` / `20` | 看门狗阈值（扫描次数 / cm / cm / 冷却扫描数） |
+| `sheathed_anchor` / `sheathed_source_bone` / `sheathed_push_cm` | `Bip001-Spine` / `spine_03` / `2.0` | 收起的武器搬到我们的脊柱并外推（§5.8.1） |
+| `anchor_max_gap_cm` | `100` | 双手间距超过此值时不做武器锚定（姿势明显是参考姿势，§5.8.2） |
+| `back_items` / `back_item_push_cm` | `Hun_Knife` + 刀鞘 / `2.0` | 腰后短刀锚到骨盆并外推（§5.10） |
+| `hide_copy_bodies` / `hide_copy_body_meshes` | `true` / `{ "Hun_Body_Simple" }` | 隐藏过场 / 预览副本上的原版身体（§6.19） |
+| `hide_hero_cloth` | `true` | 隐藏英雄的 Chaos Cloth 服装组件（§6.19） |
+| `hide_copy_outfit` | `true` | 副本上除承载网格与武器外全部隐藏（§6.19） |
+| `copy_rescan_scans` | `60` | 副本组件列表的重建周期（事件驱动之外的兜底，§6.19 的性能坑） |
+| `copy_rescan_min_scans` | `4` | 两次重建的最小间隔（过场里组件连续生成，避免每轮全扫，§6.22） |
+| `pose_watchdog` | `true` | 姿势卡住（游戏重设 leader pose）时重建重定向图，见 §6.17 |
+| `pose_step_move_cm` / `pose_step_stuck_cm` | `0.5` / `0.3` | 每轮分类阈值：原身体动、我们不动 → 记一次停滞 |
+| `pose_slip_window` / `pose_stuck_marks` | `12` / `4` | 滑动窗口与判决门槛（12 轮里 4 次停滞 ≈ 2 秒） |
+| `pose_heal_cooldown` | `6` | 两次重建之间的最小扫描间隔 |
+| `report_pose_window` | `false` | 打印看门狗自身视角的计数（排障，§8.6） |
 | `material_guard` | `[0] = ".../MI_ZeroHun_Cloth_04_b"` | 被游戏换掉的材质槽，每轮把目标实例换回去，见 §6.18 |
 | `report_materials` | `false` | 打印 8 个槽实际使用的材质实例名（排障，见 §6.18） |
 | `rescan_interval` | `0.5` | 扫描周期（秒） |
 | `probe_only` | `false` | 只观察、不改动 |
-| `report_weapon_geometry` | `false` | 武器/手骨几何普查（排障用） |
+| `report_weapon_geometry` / `report_weapon_chain` | `false` | 武器几何普查 / 挂接链变化记录（排障，**开销大**） |
 | `dump_census` / `hide_only_source` / `create_own_component` | `false` | 排障用实验路径 |
 
 ---
@@ -564,6 +756,49 @@ material[0] was MID_MI_ZeroHun_Head_Injured30_2147474746 -> restored ...
 Blender 里按多边形 UV 采样 tga，或者直接给每个材质槽套一个「贴图 → Emission」的平面材质渲染一张，
 和参考图对照即可。这条比在游戏里反复换材质快得多，也是这次排除「褪色是贴图/UV 问题」的方法（§6.18）。
 
+### 8.6 判断「姿势看门狗为什么不动」
+
+打开 `report_pose_window`，每 5 轮打印看门狗自己的视角：
+
+```
+pose window: 4/12 stalled (this scan=true) | src (-10.6, 36.7, 4.9) move 63.58 | ours (10.2, 38.2, 5.6) move 0.00
+pose: stalled (source moved 63.58, ours moved 0.00) - re-arming the retarget #1 [escalated]
+```
+
+读法：
+
+- `move` 是**组件空间**的每轮位移；若 `ours` 的某个分量长期恒定、其余分量大幅摆动，说明
+  测量空间选错了（世界坐标会把转身当成动，§6.17）。
+- `no read-out` 表示这一轮骨骼读取失败（`GetBoneTransform` 偶发返回零值），它不参与判定。
+- 判决是滑动窗口里的次数，所以单看某一轮 `stalled=false` 不代表没问题。
+
+### 8.7 判断「这个副本该不该清」
+
+打开日志看 `copy part:` / `cloth:` 行：
+
+```
+copy part: SkeletalMeshComponent          Hun_Body_Climax            (CharacterMesh0)
+cloth: hiding CA_Hun_Skirt_Climax owner=BP_Renewal_Hun_Climax_C_...
+```
+
+- 出现 `state: not adopting ... (sequence/preview actor)` 说明脚本正确拒绝了过场副本；
+- 若某个副本的部件**没有**出现在 `copy part:` 列表里，说明它没被判定为副本（检查 owner 名是否含
+  `Hun`、是否被当成了玩家 Pawn）。
+
+### 8.8 判断「崩溃是不是我们引起的」
+
+```powershell
+python tools\dump_crash.py "K:\SteamLibrary\steamapps\common\PBZ\platform\steam\ue4ss\crash_*.dmp"
+# code=0xc0000005 addr=0x14144d2d0 -> PBZ.exe+0x144d2d0
+```
+
+- 故障地址 **`PBZ.exe+0x144d2d0`** 是本 mod 已知的「对已销毁 UObject 调引擎函数」签名
+  （§6.16 的传送崩溃、§6.22 的过场崩溃都是它）。看到它先查：有没有跨扫描缓存的组件引用、
+  有没有在 `ExecuteInGameThread` 之外碰引擎对象。
+- 时间对不上（崩溃前后日志里脚本没有动作）时，先怀疑游戏自身：临时把 `ue4ss/Mods/mods.json`
+  里 `KorinsnaRetarget` 关掉，复现一遍再判断。
+- 崩溃前后**脚本最后一行**很有用：日志是逐行追加的，最后一行就是崩溃瞬间脚本正在做的事。
+
 ---
 
 ## 9. 附录：已废弃的「重新蒙皮到游戏骨架」路线
@@ -587,7 +822,11 @@ Blender 里按多边形 UV 采样 tga，或者直接给每个材质槽套一个�
 | 扭转骨轴向限制 | 未实现（IK Retargeter 只有链级模式） | 在 ABP 里加约束节点，只保留绕骨轴的旋转 |
 | 衣服质感 | 中性 ARM：全粗糙、非金属 | 想要一点高光时把 `_ARM` 的 G 改成 180（参考 2B mod 的值） |
 | 皮肤颜色 | 可琳思娜的腿/手本来就接近白色，槽 1 借的 `Cloth_02_b` 会再混一点布料噪点 | 想更干净时把槽 1 也换成纯底色实例（要同时换它唯一的 albedo 贴图路径） |
-| 游戏换材质 | 只守住槽 0（受伤头材质） | 若重伤/其它状态还会换别的槽，往 `material_guard` 里加条目 |
+| 游戏换材质 | 只守住槽 0（受伤头材质），玩家与过场副本都守（§6.18 / §6.21） | 若别的槽也被换掉，往 `material_guard` 里加条目 |
+| 跨扫描缓存 | 只存对象名，用前 `StaticFindObject` 重新解析（§6.22） | 若有新的缓存需求，沿用这个模式，不要保存 UObject 引用 |
 | 武器握点 | 手骨距离按左手/右手各一个常数 | 按武器类型细分（斧/刀/钩的握点不同） |
+| 收起的武器 | 挂到 `Bip001-Spine` + 沿背面外推 2cm（§5.8.1） | 若某类大武器在背上穿模，可按武器类型给不同的锚骨/外推 |
+| 姿势丢失 | 看门狗 2 秒内重建（§6.17） | 若能找到游戏重设 leader pose 的那个调用点，可在源头阻止而不是事后重建 |
+| 过场副本 | 运行时隐藏副本身上除我们网格与武器外的一切（§6.19） | 更彻底的做法是在资产层把 `Hun_Body_Simple` 也替换成空白网格（会丢失重定向源，需另找姿势来源） |
 | 披风/长发物理 | 已清空（外观隐藏的代价） | 若要恢复，需要在 Korinsna 自己骨架上重建布料资产 |
 | 阴影 | 承载网格不投影（避免黑斑） | 修好 retargeted mesh 的深度 pass 后可以打开 |

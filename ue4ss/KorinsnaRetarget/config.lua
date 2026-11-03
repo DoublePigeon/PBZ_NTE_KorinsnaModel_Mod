@@ -42,20 +42,58 @@ return {
         -- hilt distance from the hand bone in cm (the game uses 9.5, which is Hun's hand; ours puts
         -- the hilt outside the fist). 0 = keep the game's distance.
         grip_distance = { r = 6.0, l = 6.0 },
+        -- a weapon that is put away is carried over to Korinsna's own spine (torso), not the pelvis:
+        -- the hips sway far more, which made it look like the weapon rode her backside.
+        -- Bip001-Spine corresponds to Hun's spine_03 in the retarget chain
+        -- (pelvis->spine_05 maps onto Bip001-Pelvis->Bip001-Spine1).
+        sheathed_anchor = "Bip001-Spine",
+        sheathed_source_bone = "spine_03",
+        sheathed_push_cm = 2.0,
+        -- a weapon anchor is derived from the hand bone, so it is skipped while the pose is obviously
+        -- broken (hands more than a metre apart = reference pose)
+        anchor_max_gap_cm = 100.0,
+        -- diagnostic: log each weapon's full attach chain whenever it changes. Expensive (walks every
+        -- skeletal component and builds strings), so it is off unless a weapon bug is being chased.
+        report_weapon_chain = false,
         -- Hun's own waist knife + scabbard: anchored to Korinsna's pelvis and pushed out along the
         -- back of the skirt by `back_item_push_cm` so they no longer clip through it
         back_items = { "Hun_Knife", "Hun_Knife_Scabbard" },
         -- tuned on screen: 2 cm puts the hilt on the outside of the skirt without floating
         back_item_push_cm = 2.0,
         quiet_blank_parts = true,
+        -- cutscene / preview copies of the hero render the one original mesh that is not replaced at
+        -- asset level (the body, which is the retarget source), so the original outfit comes back
+        -- with them. Hidden here; the young hero uses other meshes and keeps his outfit.
+        hide_copy_bodies = true,
+        hide_copy_body_meshes = { "Hun_Body_Simple" },
+        -- Chaos Cloth garments (robe, cape, hair and the wardrobe's damaged variants) are components of
+        -- their own, separate from the skeletal parts, so they are hidden separately
+        hide_hero_cloth = true,
+        -- everything else a copy owns (accessories, static-mesh cards, grooms) is hidden too
+        hide_copy_outfit = true,
+        -- the sweep that finds those components walks the whole level, so it runs rarely: event driven
+        -- when a new hero copy component appears, plus this many scans as a safety net, and never more
+        -- often than copy_rescan_min_scans (a cutscene spawns components continuously)
+        copy_rescan_scans = 60,
+        copy_rescan_min_scans = 4,
         -- re-arm the retarget when the game re-applies the leader pose (model stuck in its reference
         -- pose after an interactive animation / cutscene)
         pose_watchdog = true,
-        pose_stuck_scans = 4,
-        pose_move_threshold = 1.0,
-        pose_stuck_threshold = 0.05,
+        -- Each scan is classified as "stalled" when the game's body moved more than
+        -- pose_step_move_cm while Korinsna moved less than pose_step_stuck_cm. The verdict is taken
+        -- over a sliding window (pose_slip_window) because one bad read-out can otherwise look like
+        -- motion and hide a stall.
+        pose_step_move_cm = 0.5,
+        pose_step_stuck_cm = 0.3,
+        pose_slip_window = 12,
+        pose_stuck_marks = 4,
+        -- minimum scans between two heals (0.5 s each), so an unrelated frozen pose cannot turn this
+        -- into a re-init loop
+        pose_heal_cooldown = 6,
+        -- diagnostic: print the watchdog counters every 5 scans
+        report_pose_window = false,
         -- diagnostic: log which material instance each slot renders with, once per hero
-        report_materials = true,
+        report_materials = false,
         -- the game's damage system replaces the *head part's* first material slot
         -- (Hun_Status/MI_ZeroHun_Head_Injured*); our mesh ships as that head part, so the dress slot
         -- must be put back or the dress renders with a pale skin shader

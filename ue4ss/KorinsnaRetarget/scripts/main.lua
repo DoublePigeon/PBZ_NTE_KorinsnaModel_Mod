@@ -57,6 +57,20 @@ local DEFAULTS = {
     -- ~6 cm out (measured: proximal finger joints are 6.0-6.5 cm from the hand bone head).
     -- 0 or nil leaves the game's distance alone.
     grip_distance = { r = 6.0, l = 6.0 },
+    -- A weapon that is put away is carried over to Korinsna's own body: the game hangs it on a socket
+    -- on HUN's back (wide shoulders, thick robe), where it floats behind her or cuts through the
+    -- dress. It is anchored to the middle of her spine so it follows the torso - on the pelvis it
+    -- visibly rode her backside, because the hips sway far more than the chest. `sheathed_source_bone`
+    -- is the Hun bone it corresponds to in the retarget chain (pelvis->spine_05 maps onto
+    -- Bip001-Pelvis->Bip001-Spine1, so Korinsna's middle spine is Hun's spine_03).
+    sheathed_anchor = "Bip001-Spine",
+    sheathed_source_bone = "spine_03",
+    sheathed_push_cm = 2.0,
+    -- never derive a weapon anchor from a pose whose hands are more than this far apart: that is a
+    -- reference pose, not a real one, and anchoring from it bakes a wrong offset into the weapon
+    anchor_max_gap_cm = 100.0,
+    -- diagnostic: log each weapon's full attach chain whenever it changes (draw / sheathe / swap)
+    report_weapon_chain = false,
     -- The hero's own waist knife and its scabbard: carried onto Korinsna's pelvis (so they stop
     -- riding Hun's sockets) and pushed out along the back of the dress by this many cm so they sit on
     -- the outside of the skirt instead of through it. Empty list disables the feature.
@@ -65,15 +79,41 @@ local DEFAULTS = {
     -- keep the blanked part meshes out of the shadow and main pass: degenerate triangles make the
     -- shadow pass flicker. Only the hero's own components are touched.
     quiet_blank_parts = true,
+    -- Meshes that only exist on the original hero body: the cutscene / preview copies of the hero
+    -- render them again (the player's own copy is hidden separately), so they are hidden here too.
+    -- The young hero uses different meshes and must keep his outfit.
+    hide_copy_bodies = true,
+    hide_copy_body_meshes = { "Hun_Body_Simple" },
+    -- Chaos Cloth garments are components of their own (the robe/cape/hair, plus the wardrobe's
+    -- damaged variants) and are hidden separately from the skeletal parts.
+    hide_hero_cloth = true,
+    -- Everything else a cutscene / preview copy of the hero owns (accessories, static-mesh cards,
+    -- grooms) is hidden too: those copies only need the Korinsna mesh and weapons.
+    hide_copy_outfit = true,
+    -- The sweep that finds those components walks the whole level, so it runs rarely: when a new hero
+    -- copy component appeared (event driven) or every this many scans (a safety net). Re-applying the
+    -- hiding from the cached list still happens every scan, which is what keeps it off screen.
+    copy_rescan_scans = 60,
+    -- Even when a rescan is "due", never run it more often than this: a cutscene spawns components
+    -- continuously, which would otherwise mean a full level sweep every scan.
+    copy_rescan_min_scans = 4,
     -- re-arm the retarget when the game re-applies the part components' leader pose (the model falling
     -- back to its reference pose after an interactive animation). See watch_pose().
     pose_watchdog = true,
-    -- how many consecutive scans the pose may stay frozen while the game's body keeps moving before
-    -- the retarget is re-armed, and what counts as "moving" in cm
-    pose_stuck_scans = 4,
-    pose_move_threshold = 1.0,
-    pose_stuck_threshold = 0.05,
-    pose_heal_cooldown = 20,
+    -- Each scan is classified as "stalled" when the game's body moved more than pose_step_move_cm
+    -- while Korinsna moved less than pose_step_stuck_cm; the verdict is taken over a sliding window
+    -- (pose_slip_window), because one bad read-out can otherwise look like motion and hide a stall.
+    pose_step_move_cm = 0.5,
+    pose_step_stuck_cm = 0.3,
+    pose_slip_window = 12,
+    -- 4 stalled scans (~2 s) is already a stall: the marks only become true when the game's body moves
+    -- while ours does not, so they do not fire on scattered bad read-outs
+    pose_stuck_marks = 4,
+    -- minimum scans between two heals (0.5 s each), so an unrelated frozen pose cannot turn this
+    -- into a re-init loop
+    pose_heal_cooldown = 6,
+    -- diagnostic: print the watchdog counters every 5 scans
+    report_pose_window = false,
     -- diagnostic: log which material instance each slot renders with, once per hero
     report_materials = false,
     -- Slots the game overwrites at runtime, mapped to the instance they must have. The hero's damage
@@ -250,11 +290,12 @@ end
 local function part_mesh_name(component)
     local name = mesh_name(component)
     if name then return name end
-    -- GetStaticMesh is not a member of SkeletalMeshComponent: asking for it throws, and doing that for
-    -- every skeletal component on every scan used to fill the log with thousands of failures
+    -- Only a static mesh component has GetStaticMesh: asking anything else throws, and asking it for
+    -- every component on every scan filled the log with failures (Chaos Cloth garments are skeletal
+    -- mesh components too, so "not skeletal" was not a good enough guard).
     local class = usable(try("GetClass", function() return component:GetClass() end))
     local class_name = class and short_name(full_name(class)) or nil
-    if class_name and class_name:find("Skeletal", 1, true) then return nil end
+    if class_name == nil or not class_name:find("Static", 1, true) then return nil end
     local mesh = try("GetStaticMesh", function() return component:GetStaticMesh() end)
     return usable(mesh) and short_name(full_name(mesh)) or nil
 end
@@ -380,8 +421,13 @@ local RESET_KEYS = {
     "hide_collected", "hide_targets", "hide_index", "spawned_parts",
     "leader_cleared", "opaque_done", "hidden_shadow_cleared", "materials_reported",
     "pose_prev", "pose_stuck", "pose_heals", "pose_samples", "pose_heal_tick",
+    "pose_window", "pose_fail_streak", "pose_last_ours", "pose_identical",
     "attach_checks", "geo_checks", "census_steps", "dumped_everything",
     "reported_sockets", "weapon_attached", "weapon_prev", "mids", "hidden_shadow_cleared",
+    "weapon_sockets", "weapon_reanchor", "weapon_reanchor_ready",
+    "copy_hidden", "copy_leader", "copy_reported", "cloth_seen", "cloth_reported",
+    "copy_seen", "copy_outfit_reported", "copy_list", "copy_carriers", "cloth_list",
+    "copy_dirty", "copy_scan_tick",
 }
 
 local function reset_actor_state(reason)
@@ -989,6 +1035,12 @@ end
 
 local distance -- defined further down, the watchdog below needs it
 
+-- The watchdog needs a vector that only reflects the POSE, not where the character is or which way it
+-- faces. World space is out: during the very interaction that breaks the retarget the character turns
+-- to face its partner, and a frozen pose then looks like a fast-moving one (measured: the vector's Z
+-- stayed at 5.6 while X/Y swung around a circle of ~45 cm radius). Component space is rotation
+-- invariant, so that is what is used - `GetBoneTransform` occasionally answers with a zeroed transform
+-- in this build, which is filtered out as "no information" by the caller.
 local function hand_vector(component, hand_bone, pelvis_bone)
     local hand = bone_component(component, hand_bone)
     local pelvis = bone_component(component, pelvis_bone)
@@ -996,11 +1048,13 @@ local function hand_vector(component, hand_bone, pelvis_bone)
     return sub(hand, pelvis)
 end
 
-local function rearm_pose(target, source_moved, ours_moved)    state.pose_heals = (state.pose_heals or 0) + 1
+local function rearm_pose(target, source_moved, ours_moved, escalate)
+    state.pose_heals = (state.pose_heals or 0) + 1
     trace(string.format(
-        "pose: stalled (source moved %.2f, ours %.2f) - re-arming the retarget #%d" ..
+        "pose: stalled (source moved %.2f, ours moved %.2f) - re-arming the retarget #%d%s" ..
         " (anim=%s animclass=%s post=%s)",
         source_moved or -1, ours_moved or -1, state.pose_heals,
+        escalate and " [escalated]" or "",
         anim_instance_name(target), anim_class_name(target), post_instance_name(target)))
     -- the leader pose is the usual culprit: a follower component does not evaluate its animation
     try("watchdog SetLeaderPoseComponent",
@@ -1010,41 +1064,120 @@ local function rearm_pose(target, source_moved, ours_moved)    state.pose_heals 
         function() target:SetDisablePostProcessBlueprint(false) end)
     try("watchdog SetComponentTickEnabled", function() target:SetComponentTickEnabled(true) end)
     try("watchdog SetBoundsScale", function() target:SetBoundsScale(2.0) end)
+    if escalate then
+        -- Second failure in a row: force the post-process instance to be built again. Toggling the
+        -- flag is the only thing available from Lua that makes the component re-create its
+        -- PostProcessInstance, and it is what recovers the pose when clearing the leader pose alone
+        -- does not.
+        try("watchdog post-process off",
+            function() target:SetDisablePostProcessBlueprint(true) end)
+        try("watchdog keep ticking", function() target:SetComponentTickEnabled(true) end)
+        try("watchdog post-process on",
+            function() target:SetDisablePostProcessBlueprint(false) end)
+        try("watchdog mark dirty", function() target:MarkRenderStateDirty() end)
+    end
     trace("pose: re-armed (post=" .. post_instance_name(target) .. ")")
+    -- the pose the weapons were anchored against may have been the broken one: re-anchor them
+    state.weapon_reanchor = true
+end
+
+-- Consecutive counters are useless here: the read-out occasionally returns a stale/zero transform for
+-- one scan (measured: a frozen pose reported 3.0,-38.8,5.1 in the middle of a run of 9.7,-37.7,5.1),
+-- and a single outlier reset the counters, so a pose frozen for 17 s only healed at the end. Instead
+-- every scan is classified, and the verdict is taken over a sliding window, so a few outliers cannot
+-- hide a stall.
+local function count_marks(marks)
+    local count = 0
+    for index = 1, #marks do
+        if marks[index] then count = count + 1 end
+    end
+    return count
 end
 
 local function watch_pose(target)
     if not config.pose_watchdog then return end
     if not valid(target) or not valid(state.source) then return end
+
+    -- Fast, unambiguous signal: while the retarget graph exists the component always has a
+    -- post-process instance. When the game tears it down (which is what happens around interactive
+    -- animations), the pose is already lost - do not wait for the window.
+    local post = try("GetPostProcessInstance",
+        function() return target:GetPostProcessInstance() end)
+    if not usable(post) then
+        if state.pose_heal_tick == nil or state.tick - state.pose_heal_tick
+            >= (config.pose_heal_cooldown or 6) then
+            state.pose_heal_tick = state.tick
+            state.pose_fail_streak = (state.pose_fail_streak or 0) + 1
+            trace("pose: post-process instance is gone - rebuilding the retarget")
+            rearm_pose(target, -1, -1, true)
+        end
+        return
+    end
+
     local now = {
         source = hand_vector(state.source, "hand_r", "pelvis"),
         ours = hand_vector(target, "Bip001-R-Hand", "Bip001-Pelvis"),
     }
     local previous = state.pose_prev
     state.pose_prev = now
-    if previous == nil or previous.source == nil or previous.ours == nil
-        or now.source == nil or now.ours == nil then
-        state.pose_stuck = 0
+
+    -- A zero/garbage read means "no information", not "the pose moved": drop it and keep the last
+    -- good sample, otherwise an outlier looks like motion.
+    local function plausible(vector)
+        if vector == nil then return nil end
+        local length = math.sqrt(vector.X * vector.X + vector.Y * vector.Y + vector.Z * vector.Z)
+        if length < 5.0 or length > 200.0 then return nil end
+        return vector
+    end
+    now.source = plausible(now.source)
+    now.ours = plausible(now.ours)
+
+    local window = config.pose_slip_window or 12
+    local marks = state.pose_marks or {}
+    local src_move = (previous and previous.source and now.source)
+        and distance(now.source, previous.source) or 0.0
+    local ours_move = (previous and previous.ours and now.ours)
+        and distance(now.ours, previous.ours) or 0.0
+    -- when either read-out is missing the scan says nothing either way; skip it instead of counting it
+    -- as "the pose moved" (which would dilute the window)
+    if now.source == nil or now.ours == nil then
+        if config.report_pose_window and state.tick % 5 == 0 then
+            trace(string.format("pose window: no read-out (src %s, ours %s)",
+                fmt_vec(now.source), fmt_vec(now.ours)))
+        end
         return
     end
-    local source_moved = distance(now.source, previous.source)
-    local ours_moved = distance(now.ours, previous.ours)
-    if source_moved > (config.pose_move_threshold or 1.0)
-        and ours_moved < (config.pose_stuck_threshold or 0.05) then
-        state.pose_stuck = (state.pose_stuck or 0) + 1
-    else
-        state.pose_stuck = 0
-    end
-    if state.pose_stuck < (config.pose_stuck_scans or 4) then return end
-    state.pose_stuck = 0
-    -- Never more often than the cooldown: a pose that is stuck for another reason must not turn this
-    -- into a re-init loop.
-    local cooldown = config.pose_heal_cooldown or 20
-    if state.pose_heal_tick ~= nil and state.tick - state.pose_heal_tick < cooldown then return end
-    state.pose_heal_tick = state.tick
-    rearm_pose(target, source_moved, ours_moved)
-end
+    local stalled_now = src_move > (config.pose_step_move_cm or 0.5)
+        and ours_move < (config.pose_step_stuck_cm or 0.3)
+    marks[#marks + 1] = stalled_now
+    while #marks > window do table.remove(marks, 1) end
+    state.pose_marks = marks
 
+    local stalled = count_marks(marks)
+    if config.report_pose_window and state.tick % 5 == 0 then
+        trace(string.format(
+            "pose window: %d/%d stalled (this scan=%s) | src %s move %.2f | ours %s move %.2f",
+            stalled, #marks, tostring(stalled_now), fmt_vec(now.source), src_move,
+            fmt_vec(now.ours), ours_move))
+    end
+    -- the pose is animating again, so a weapon waiting to be re-anchored can be handed back to the
+    -- game's socket now (see anchor_held_weapons)
+    if state.weapon_reanchor and ours_move > 0.5 then
+        state.weapon_reanchor_ready = true
+    end
+    if stalled < (config.pose_stuck_marks or 4) then
+        if stalled == 0 then state.pose_fail_streak = 0 end
+        return
+    end
+    if state.pose_heal_tick ~= nil
+        and state.tick - state.pose_heal_tick < (config.pose_heal_cooldown or 6) then
+        return
+    end
+    state.pose_heal_tick = state.tick
+    state.pose_marks = {}
+    state.pose_fail_streak = (state.pose_fail_streak or 0) + 1
+    rearm_pose(target, src_move, ours_move, state.pose_fail_streak >= 2)
+end
 local function dump_component(component, tag)
     if not valid(component) then
         trace(string.format("%s: <stale>", tag))
@@ -1491,12 +1624,124 @@ local function pull_to_grip(component, origin, target_length)
     return target_length
 end
 
+local function push_log_once(key, message)
+    state.log_once = state.log_once or {}
+    if state.log_once[key] then return end
+    state.log_once[key] = true
+    trace(message)
+end
+
+-- A holstered weapon hangs from a socket on the hero's body. The socket itself is fine - the hidden
+-- body is still animated and the retargeted pose follows the same animation - but the socket sits on
+-- HUN's back: wide shoulders, thick robe. Korinsna is smaller and her skirt is rigid, so a weapon left
+-- on that socket floats behind her or cuts through the dress (the same reason the waist knife is
+-- anchored to her pelvis, see anchor_back_items).
+--
+-- So a weapon that is put away is carried over to Korinsna's own body: pelvis to pelvis (which keeps
+-- its left/right and up/down placement on the back), keeping the game's world rotation, plus the same
+-- outward push along the back of the dress that the waist knife uses. Once attached to her pelvis it
+-- simply follows her animation, and nothing has to be corrected per frame.
+local function anchor_sheathed_weapon(root, source, socket, mesh)
+    local carrier = state.body or state.carrier
+    if not valid(carrier) or not valid(source) then return end
+    local carrier_name = full_name(carrier)
+    local socket_world = try("GetSocketLocation",
+        function() return source:GetSocketLocation(FName(socket)) end)
+    local gap = distance(component_location(root), socket_world)
+    local key = full_name(root) or tostring(mesh)
+
+    local our_spine = bone_world(carrier, config.sheathed_anchor or "Bip001-Spine")
+    local hun_spine = bone_world(source, config.sheathed_source_bone or "spine_03")
+    if not our_spine or not hun_spine then
+        -- fall back to the pelvis pair, which is always present
+        our_spine = bone_world(carrier, "Bip001-Pelvis")
+        hun_spine = bone_world(source, "pelvis")
+    end
+    if not socket_world or not our_spine or not hun_spine then return end
+
+    -- keep the weapon's placement on the back, but expressed on OUR torso: pelvis-to-spine would put
+    -- it where the hips are, and the hips sway a lot during locomotion, which looked like the weapon
+    -- riding the character's backside. Same idea as the hand anchor (our bone - the game's bone).
+    local delta = sub(our_spine, hun_spine)
+    local back = back_direction(carrier, our_spine)
+    local push = config.sheathed_push_cm or 0.0
+    if back and push ~= 0 then
+        delta = { X = delta.X + back.X * push, Y = delta.Y + back.Y * push, Z = delta.Z }
+    end
+
+    push_log_once("holster|" .. key, string.format(
+        "weapon: %s holstered on '%s' (socket gap %.1f cm) -> %s", tostring(mesh),
+        tostring(socket), gap, config.sheathed_anchor or "Bip001-Spine"))
+
+    local bone = config.sheathed_anchor or "Bip001-Spine"
+    try("attach sheathed weapon", function()
+        return root:K2_AttachToComponent(carrier, FName(bone), 1, 1, 1, false)
+    end)
+    if full_name(try("GetAttachParent", function() return root:GetAttachParent() end))
+        ~= carrier_name then
+        trace("weapon: could not carry " .. tostring(mesh) .. " over to " .. bone)
+        return
+    end
+    shift_world(root, delta)
+    -- Deliberately no visibility change here: the weapon actor's ROOT is not the weapon mesh (the mesh
+    -- is a child called "Weapon Mesh"), and forcing the root visible/renderable made the game's hidden
+    -- helper geometry show up as a translucent box with an arrow. The game keeps the weapon itself
+    -- visible; carrying the root is all that is needed.
+    state.weapon_carried = state.weapon_carried or {}
+    if not state.weapon_carried[key] then
+        state.weapon_carried[key] = true
+        trace(string.format("weapon: %s carried to %s, moved %s, pushed %.1f cm along %s",
+            tostring(mesh), bone, fmt_vec(delta), push, fmt_vec(back)))
+    end
+end
+
 local function anchor_held_weapons()
     local carrier = state.body or state.carrier
     local source = state.source
     if not valid(carrier) or not valid(source) then return end
     local carrier_name = full_name(carrier)
     local source_name = full_name(source)
+
+    -- After a pose heal the weapon keeps the relative transform it was given while the hand bone was
+    -- still in its (wrong) reference pose, which shows up as a wrong blade orientation until the
+    -- weapon is swapped. Put such a weapon back on the game's own socket; the normal anchoring below
+    -- re-derives the offset from a correct pose on the next scan.
+    if state.weapon_reanchor then
+        -- Wait until the pose is demonstrably alive again: re-anchoring in the same scan as the heal
+        -- bakes the broken pose into the weapon again (measured: a 182 cm hand gap, i.e. the hand was
+        -- still at the reference pose).
+        if not state.weapon_reanchor_ready then
+            return
+        end
+        state.weapon_reanchor_ready = false
+        local objects = try("FindAllOf SkeletalMeshComponent",
+            function() return FindAllOf("SkeletalMeshComponent") end)
+        if type(objects) == "table" then
+            local seen = {}
+            for _, obj in pairs(objects) do
+                if usable(obj) and not is_cdo(obj) then
+                    local mesh = part_mesh_name(obj)
+                    if mesh ~= nil and is_weapon_mesh(mesh) then
+                        local root = actor_root_of(obj)
+                        local key = usable(root) and full_name(root) or nil
+                        local socket = key and (state.weapon_sockets or {})[key] or nil
+                        if key and socket and not seen[key]
+                            and full_name(try("GetAttachParent",
+                                function() return root:GetAttachParent() end)) == carrier_name then
+                            seen[key] = true
+                            try("reanchor weapon", function()
+                                return root:K2_AttachToComponent(source, FName(socket), 2, 2, 2, false)
+                            end)
+                            trace("weapon: " .. tostring(mesh) ..
+                                " returned to '" .. tostring(socket) .. "' for a fresh anchor")
+                        end
+                    end
+                end
+            end
+        end
+        state.weapon_reanchor = false
+    end
+
     local hands = {}
     for side, names in pairs(HANDS) do
         hands[side] = {
@@ -1504,6 +1749,14 @@ local function anchor_held_weapons()
             game = bone_world(source, names.game),
             ours = bone_world(carrier, names.ours),
         }
+    end
+
+    -- The weapon anchor is derived from the hand bone, so never anchor while the pose is obviously
+    -- broken (the hands more than a metre apart cannot be a real pose): wait for the next scan.
+    local gap_now = distance(hands.r.game, hands.r.ours)
+    if gap_now > (config.anchor_max_gap_cm or 100.0) then
+        push_log_once("gap|" .. string.format("%.0f", gap_now),
+            string.format("weapon: holding off, the pose looks broken (hand gap %.1f cm)", gap_now))
     end
 
     local objects = try("FindAllOf SkeletalMeshComponent",
@@ -1525,13 +1778,19 @@ local function anchor_held_weapons()
                         seen[key] = true
                         local parent_name = full_name(try("GetAttachParent",
                             function() return root:GetAttachParent() end))
-                        -- anything the game hangs elsewhere (a back socket, a chest, the world) is
-                        -- left alone; only a hand mount on the hero body is redirected
+                        -- Anything the game hangs elsewhere (a back socket, the chest, the world) keeps
+                        -- the game's anchor - but see anchor_sheathed_weapon.
                         if parent_name ~= carrier_name and parent_name == source_name then
                             local socket = socket_text_of(root)
                             local side = mount_side(socket)
                             local hand = side and hands[side] or nil
                             if hand and hand.game and hand.ours then
+                                -- A hand mount is only anchored from a plausible pose; leaving it on
+                                -- the game's socket for one more scan is invisible, anchoring from a
+                                -- reference pose bakes a wrong offset into the weapon.
+                                if gap_now > (config.anchor_max_gap_cm or 100.0) then
+                                    -- nothing to do this scan
+                                else
                                 local before = distance(component_location(root), hand.game)
                                 try("attach weapon " .. tostring(mesh), function()
                                     return root:K2_AttachToComponent(carrier, FName(hand.bone),
@@ -1544,6 +1803,11 @@ local function anchor_held_weapons()
                                     shift_world(root, delta)
                                     local grip = pull_to_grip(root, hand.ours,
                                         (config.grip_distance or {})[side])
+                                    -- remembered so a re-anchor after a pose heal can put the weapon
+                                    -- back where the game had it (see anchor_held_weapons)
+                                    state.weapon_sockets = state.weapon_sockets or {}
+                                    state.weapon_sockets[key] = socket
+
                                     -- "was" is how far the weapon sat from Hun's hand; it is also the
                                     -- offset we reproduce, and "now" is after the grip rescale
                                     trace(string.format(
@@ -1554,16 +1818,9 @@ local function anchor_held_weapons()
                                 else
                                     trace("weapon: could not attach " .. tostring(mesh))
                                 end
-                            else
-                                -- once per weapon: confirms what was seen and why nothing was done
-                                local once = tostring(mesh) .. "|" .. socket
-                                state.weapon_skipped = state.weapon_skipped or {}
-                                if not state.weapon_skipped[once] then
-                                    state.weapon_skipped[once] = true
-                                    trace(string.format(
-                                        "weapon: %s on '%s' is not a hand mount, left alone",
-                                        tostring(mesh), socket))
                                 end
+                            else
+                                anchor_sheathed_weapon(root, source, socket, mesh)
                             end
                         end
                     end
@@ -1630,6 +1887,380 @@ local function anchor_back_items()
     end
 end
 
+-- True when the actor is the pawn the player actually controls. Cutscene / preview copies of the hero
+-- exist as extra actors with the same part assets; those must never take over the retarget, and they
+-- are exactly the actors whose leftover outfit has to be hidden.
+local player_pawn_cache = { tick = -1, name = nil, logged = false }
+
+local function player_pawn_name()
+    if player_pawn_cache.tick == state.tick then return player_pawn_cache.name end
+    local found = nil
+    local count = 0
+    local controllers = try("FindAllOf PlayerController",
+        function() return FindAllOf("PlayerController") end)
+    if type(controllers) == "table" then
+        for _, controller in pairs(controllers) do
+            if usable(controller) then
+                count = count + 1
+                local pawn = try("K2_GetPawn", function() return controller:K2_GetPawn() end)
+                if not usable(pawn) then
+                    pawn = try("GetControlledPawn",
+                        function() return controller:GetControlledPawn() end)
+                end
+                if not usable(pawn) then
+                    pawn = try("GetPawn", function() return controller:GetPawn() end)
+                end
+                if usable(pawn) then
+                    found = full_name(pawn)
+                    break
+                end
+            end
+        end
+    end
+    if not player_pawn_cache.logged or player_pawn_cache.name ~= found then
+        player_pawn_cache.logged = true
+        player_pawn_cache.name = found
+        trace(string.format("pawn: %s (%d controller(s) seen)",
+            found and short_name(found) or "unresolved", count))
+    end
+    player_pawn_cache.tick = state.tick
+    player_pawn_cache.name = found
+    return found
+end
+
+local function is_player_pawn(actor_name)
+    if actor_name == nil then return false end
+    return player_pawn_name() == actor_name
+end
+
+-- Names the game gives the hero actors it spawns for playback instead of gameplay: a level sequence
+-- copy (`BP_Seq_Hun_C`, `BP_Seq_Hun_Climax_C`) and the wardrobe's appearance preview. This is the one
+-- discriminator that does not depend on the pawn lookup working, so it is used both for "do not adopt
+-- this actor" and for "clean this actor's leftover outfit up".
+local COPY_NAME_MARKERS = { "BP_Seq_", "Preview" }
+
+local function looks_like_copy(owner_name)
+    if owner_name == nil then return false end
+    for _, marker in ipairs(COPY_NAME_MARKERS) do
+        if owner_name:find(marker, 1, true) then return true end
+    end
+    return false
+end
+
+-- The young hero's meshes are different (`Hun_Young_*`) and must keep their outfit, so anything whose
+-- owner mentions "Young" is out of scope for every cleanup below.
+local function hero_owned(owner_name)
+    if owner_name == nil then return false end
+    if owner_name:find("Young", 1, true) then return false end
+    return owner_name:find("Hun", 1, true) ~= nil
+end
+
+-- A hero actor that is NOT the player: the cutscene copies (`BP_Seq_Hun_C`, `BP_Seq_Hun_Climax_C`),
+-- the appearance preview, and anything else the game spawns with the hero's part assets. Deciding this
+-- by "is the player pawn" rather than by our own state matters: on the prologue map the player is the
+-- YOUNG hero, so the mod has no carrier of its own there - and yet the adult copies in the cutscene
+-- still render the original outfit and must be cleaned up.
+local function is_hero_copy(owner_name)
+    if not hero_owned(owner_name) then return false end
+    if owner_name == state.actor_name then return false end
+    -- a sequence / preview actor is always a copy
+    if looks_like_copy(owner_name) then return true end
+    -- any other hero-looking actor is a copy when the pawn can be resolved and it is not the pawn
+    -- (a cutscene can reuse a gameplay-looking hero class, e.g. `BP_Renewal_Hun_Climax_C`)
+    local pawn = player_pawn_name()
+    return pawn ~= nil and pawn ~= owner_name
+end
+
+-- Object path -> live object, cached. Only objects that already exist in memory resolve, which is
+-- fine here: every material instance we name is referenced by the mesh itself, so it is loaded.
+local function resolve_material(path)
+    if state.material_cache == nil then state.material_cache = {} end
+    local cached = state.material_cache[path]
+    if usable(cached) then return cached end
+    local found = find_loaded(path)
+    if found then
+        state.material_cache[path] = found
+    end
+    return found
+end
+
+-- The game's status system swaps the first material slot of the *head part* when the hero is hurt
+-- (`Hun_Status/MI_ZeroHun_Head_Injured*`, seen in the log as
+-- `material[0] MID_MI_ZeroHun_Head_Injured30_...`). Our mesh ships as that head part, so the dress
+-- slot ended up rendering with a pale skin shader instead of its albedo - the "faded dress" bug.
+-- Whatever the game puts in a guarded slot is replaced with the intended instance again.
+local function guard_materials(component, label)
+    local guard = config.material_guard
+    if type(guard) ~= "table" then return end
+    local prefix = label or "material"
+    for index, path in pairs(guard) do
+        local want = resolve_material(path)
+        if want == nil then
+            if not state.guard_missing then
+                state.guard_missing = true
+                trace(prefix .. ": cannot resolve " .. tostring(path))
+            end
+        else
+            local have = try("GetMaterial", function() return component:GetMaterial(index) end)
+            local have_name = usable(have) and full_name(have) or "<none>"
+            if have_name ~= full_name(want) then
+                local ok = pcall(function() component:SetMaterial(index, want) end)
+                trace(string.format("%s: slot %d was %s -> restored %s (%s)", prefix, index,
+                    tostring(short_name(have_name)), tostring(short_name(path)),
+                    ok and "ok" or "FAILED"))
+            end
+        end
+    end
+end
+
+-- Re-resolve a cached component by its object name.
+--
+-- A cached UObject wrapper outlives the object: the cutscene copies are created and destroyed
+-- continuously, and calling an engine function on a freed pointer crashes inside the game itself
+-- (0xc0000005 in PBZ.exe, the same signature as the teleport crash that §6.16 fixed). Resolving the
+-- name again proves the object is still alive before anything is touched, and costs a hash lookup.
+local function resolve_component(key)
+    if key == nil then return nil end
+    local found = nil
+    pcall(function() found = StaticFindObject(key) end)
+    found = usable(found)
+    if found == nil then return nil end
+    -- the same name must still denote the same object (a recycled name is not our component)
+    if full_name(found) ~= key then return nil end
+    return found
+end
+
+-- The hero exists more than once: the player actor, plus the copies the game spawns for cutscenes
+-- (`BP_Seq_Hun_C`, `BP_Seq_Hun_Climax_C`) and for the appearance preview. `Hun_Body_Simple` is the one
+-- original-outfit mesh this mod does NOT replace at asset level (the real body is the retarget pose
+-- source, so it is hidden at runtime only, see `hide_source_visibility`) - which means every copy
+-- renders the original outfit again, together with whatever else it carries (accessory static meshes,
+-- Chaos Cloth garments, grooms).
+--
+-- The copies only need OUR mesh, so everything else they own is hidden. Two properties matter for the
+-- implementation:
+--   * the sweep must not run over the whole level every scan. `FindAllOf("StaticMeshComponent")` on a
+--     real map walks thousands of components, and doing that twice a second visibly stuttered the
+--     game. The component list is therefore collected rarely (when something new appeared, or every
+--     `copy_rescan_scans`) and re-applied from the cache every scan.
+--   * the copy's body keeps ticking and its Korinsna mesh gets its leader pose cleared once, so the
+--     retarget graph still runs inside the cutscene instead of showing the reference pose.
+--
+-- The young hero uses different meshes (`Hun_Young_*`), is never a copy of the adult hero, and keeps
+-- his outfit.
+local COPY_CLASSES = {
+    "SkeletalMeshComponent", "StaticMeshComponent", "ChaosClothComponent",
+    "GroomComponent", "SkeletalMeshComponentBudgeted",
+}
+
+local function copy_component_entry(obj, class_name)
+    local is_mesh_class = class_name == "SkeletalMeshComponent"
+        or class_name == "StaticMeshComponent"
+        or class_name == "SkeletalMeshComponentBudgeted"
+    local mesh = is_mesh_class and part_mesh_name(obj) or nil
+    local asset = mesh
+    if asset == nil and class_name == "ChaosClothComponent" then
+        asset = object_name(try("GetClothAsset", function() return obj:GetClothAsset() end))
+    end
+    -- only the name is cached, never the object itself (see resolve_component)
+    return { key = full_name(obj), class = class_name, mesh = mesh, asset = asset }
+end
+
+-- Rare, expensive: rebuild the list of components that belong to hero copies and must be hidden.
+local function collect_copy_components()
+    state.copy_seen = state.copy_seen or {}
+    state.copy_list = {}
+    for _, class_name in ipairs(COPY_CLASSES) do
+        local objects = try("FindAllOf " .. class_name, function() return FindAllOf(class_name) end)
+        if type(objects) == "table" then
+            for _, obj in pairs(objects) do
+                if usable(obj) and not is_cdo(obj) then
+                    local owner_name = full_name(try("GetOwner", function() return obj:GetOwner() end))
+                    if is_hero_copy(owner_name) then
+                        local key = full_name(obj)
+                        if key ~= nil and key ~= state.carrier_name then
+                            local entry = copy_component_entry(obj, class_name)
+                            -- the carrier is our own mesh and weapons are supposed to stay visible
+                            local keep = entry.mesh ~= nil and (entry.mesh == config.carrier_mesh_name
+                                or is_weapon_mesh(entry.mesh))
+                            if not keep then
+                                state.copy_list[#state.copy_list + 1] = entry
+                                local tag = class_name .. "|" .. tostring(entry.asset)
+                                if not state.copy_seen[tag] then
+                                    state.copy_seen[tag] = true
+                                    trace(string.format("copy part: %-30s %-26s (%s)",
+                                        class_name, tostring(entry.asset), tostring(short_name(key))))
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    trace("copy part: " .. #state.copy_list .. " component(s) to keep hidden on hero copies")
+    return state.copy_list
+end
+
+-- Cheap: re-apply the hiding to the cached list (the game's wardrobe / sequence pass turns parts back
+-- on), and set up the pieces that need a one-off call. Every entry is re-resolved by name first: the
+-- cutscene copies come and go constantly, and touching one that has been destroyed crashes the game.
+local function apply_copy_hiding()
+    local list = state.copy_list
+    if list == nil then return end
+    state.copy_hidden = state.copy_hidden or {}
+    state.copy_leader = state.copy_leader or {}
+    local dropped = 0
+    for index = 1, #list do
+        local entry = list[index]
+        -- never hide our own mesh, whatever the classification said
+        if entry.mesh ~= config.carrier_mesh_name then
+            local obj = resolve_component(entry.key)
+            if obj == nil then
+                dropped = dropped + 1
+            else
+                local key = entry.key
+                if entry.mesh ~= nil and not state.copy_hidden[key] then
+                    state.copy_hidden[key] = true
+                    -- the pose has to keep updating even though the mesh is no longer drawn: the
+                    -- copy's own Korinsna mesh is a leader-pose follower of it and retargets from it
+                    force_anim_refresh(obj)
+                end
+                try("copy part SetVisibility", function() obj:SetVisibility(false, false) end)
+                try("copy part SetHiddenInGame", function() obj:SetHiddenInGame(true, false) end)
+                try("copy part SetRenderInMainPass", function() obj:SetRenderInMainPass(false) end)
+                try("copy part SetCastShadow", function() obj:SetCastShadow(false) end)
+            end
+        end
+    end
+    if dropped > 0 then
+        -- the list contains dead components; rebuild it soon instead of touching them again
+        state.copy_dirty = true
+    end
+
+    -- the copies' own Korinsna mesh: clear the leader pose once so it evaluates the retarget graph, and
+    -- keep its material slots guarded - the game swaps the head part's first slot (the dress) on these
+    -- copies too, which is why the dress looked faded during cutscenes (§6.21).
+    local carriers = state.copy_carriers
+    if carriers == nil then return end
+    for index = 1, #carriers do
+        local obj = resolve_component(carriers[index])
+        if obj ~= nil then
+            local key = carriers[index]
+            if key ~= state.carrier_name and not state.copy_leader[key] then
+                state.copy_leader[key] = true
+                try("copy leader pose clear",
+                    function() obj:SetLeaderPoseComponent(nil, true, true) end)
+                try("copy SetEnableAnimation", function() obj:SetEnableAnimation(true) end)
+                try("copy SetDisablePostProcessBlueprint",
+                    function() obj:SetDisablePostProcessBlueprint(false) end)
+                try("copy keep ticking", function() obj:SetComponentTickEnabled(true) end)
+                trace("copy: made " .. tostring(short_name(key)) .. " evaluate the retarget")
+            end
+            guard_materials(obj, "copy material")
+        else
+            state.copy_dirty = true
+        end
+    end
+end
+
+-- Rare, expensive: the copies' own Korinsna meshes (which must keep running) and the Chaos Cloth
+-- garments on any hero (the wardrobe has variants whose assets are not blanked at design time).
+local function collect_hero_garments()
+    state.copy_carriers = {}
+    state.cloth_list = {}
+    state.cloth_seen = state.cloth_seen or {}
+
+    local meshes = try("FindAllOf SkeletalMeshComponent",
+        function() return FindAllOf("SkeletalMeshComponent") end)
+    if type(meshes) == "table" then
+        for _, obj in pairs(meshes) do
+            if usable(obj) and not is_cdo(obj) then
+                local owner_name = full_name(try("GetOwner", function() return obj:GetOwner() end))
+                if is_hero_copy(owner_name) and part_mesh_name(obj) == config.carrier_mesh_name then
+                    -- names only: a copy can be destroyed before the next scan (see resolve_component)
+                    local key = full_name(obj)
+                    if key ~= nil then
+                        state.copy_carriers[#state.copy_carriers + 1] = key
+                    end
+                end
+            end
+        end
+    end
+
+    local cloths = try("FindAllOf ChaosClothComponent",
+        function() return FindAllOf("ChaosClothComponent") end)
+    if type(cloths) == "table" then
+        for _, obj in pairs(cloths) do
+            if usable(obj) and not is_cdo(obj) then
+                local owner_name = full_name(try("GetOwner", function() return obj:GetOwner() end))
+                if hero_owned(owner_name) then
+                    local asset_name = object_name(try("GetClothAsset",
+                        function() return obj:GetClothAsset() end))
+                    local key = full_name(obj)
+                    if key ~= nil then
+                        state.cloth_list[#state.cloth_list + 1] = key
+                        if not state.cloth_seen[key] then
+                            state.cloth_seen[key] = true
+                            trace(string.format("cloth: hiding %s owner=%s", asset_name,
+                                tostring(short_name(owner_name))))
+                        end
+                    end
+                end
+            end
+        end
+    end
+    trace(string.format("cloth: %d garment(s), %d copy carrier(s)", #state.cloth_list,
+        #state.copy_carriers))
+end
+
+local function apply_cloth_hiding()
+    local list = state.cloth_list
+    if list == nil then return end
+    local dropped = 0
+    for index = 1, #list do
+        local obj = resolve_component(list[index])
+        if obj == nil then
+            dropped = dropped + 1
+        else
+            try("cloth SetVisibility", function() obj:SetVisibility(false, false) end)
+            try("cloth SetHiddenInGame", function() obj:SetHiddenInGame(true, false) end)
+            try("cloth SetRenderInMainPass", function() obj:SetRenderInMainPass(false) end)
+            try("cloth SetCastShadow", function() obj:SetCastShadow(false) end)
+        end
+    end
+    if dropped > 0 then state.copy_dirty = true end
+end
+
+-- Runs whether or not the retarget is set up: on the prologue map the player IS the young hero (a
+-- different mesh, not replaced), so the mod idles there, while the adult copies in that map's
+-- cutscenes still render the original outfit.
+local function sweep_other_heroes()
+    -- The rescan walks every skeletal / static mesh in the level, so it must not be triggered by every
+    -- single component the game spawns: during a cutscene that would be a full sweep per scan.
+    -- `copy_dirty` is still honoured, but not more often than `copy_rescan_min_scans`.
+    local since_last = state.tick - (state.copy_scan_tick or -100000)
+    local due = state.copy_list == nil
+        or ((state.copy_dirty or since_last >= (config.copy_rescan_scans or 60))
+            and since_last >= (config.copy_rescan_min_scans or 4))
+    if due then
+        state.copy_dirty = false
+        state.copy_scan_tick = state.tick
+        if config.hide_copy_outfit or config.hide_copy_bodies then
+            collect_copy_components()
+        end
+        if config.hide_hero_cloth or config.hide_copy_bodies then
+            collect_hero_garments()
+        end
+    end
+    if config.hide_copy_outfit or config.hide_copy_bodies then
+        apply_copy_hiding()
+    end
+    if config.hide_hero_cloth then
+        apply_cloth_hiding()
+    end
+end
+
 -- The hero's blanked part meshes are sub-centimetre degenerate triangles. They are invisible, but a
 -- shadow pass over near-zero-area geometry is a classic source of flickering black specks, which is
 -- what kept appearing around the character. Keeping them out of both the shadow and the main pass
@@ -1654,7 +2285,8 @@ local function hero_part_components()
                 local mesh = part_mesh_name(obj)
                 if mesh ~= nil and key ~= state.carrier_name and key ~= state.source_name
                     and not is_weapon_mesh(mesh) then
-                    list[#list + 1] = obj
+                    -- names, not objects: the wardrobe can destroy a part while the map keeps running
+                    list[#list + 1] = key
                 end
             end
         end
@@ -1670,8 +2302,8 @@ local function quiet_blank_parts()
     if state.actor_name == nil then return end
     local list = hero_part_components()
     for index = 1, #list do
-        local obj = list[index]
-        if valid(obj) then
+        local obj = resolve_component(list[index])
+        if obj ~= nil then
             try("part SetCastShadow", function() obj:SetCastShadow(false) end)
             try("part SetRenderInMainPass", function() obj:SetRenderInMainPass(false) end)
         end
@@ -1730,6 +2362,55 @@ local function attach_chain(component, depth)
     end
     return table.concat(parts, " <- ")
 end
+
+-- A weapon that is put away must end up exactly where the game's back socket puts it. The only way to
+-- know what the game does at that moment is to record the whole attach chain whenever it changes
+-- (which component is attached to what, with which socket), so the fix works from facts.
+local function watch_weapon_chain()
+    if not config.report_weapon_chain then return end
+    local source = state.source
+    if not valid(source) then return end
+    local carrier = state.body or state.carrier
+    local carrier_name = valid(carrier) and full_name(carrier) or "<none>"
+    local objects = try("FindAllOf SkeletalMeshComponent",
+        function() return FindAllOf("SkeletalMeshComponent") end)
+    if type(objects) ~= "table" then return end
+    state.weapon_chain = state.weapon_chain or {}
+    local seen = {}
+    for _, obj in pairs(objects) do
+        if usable(obj) and not is_cdo(obj) then
+            local mesh = part_mesh_name(obj)
+            if mesh ~= nil and is_weapon_mesh(mesh) then
+                local owner = try("GetOwner", function() return obj:GetOwner() end)
+                if usable(owner) and full_name(owner) ~= state.actor_name then
+                    local root = actor_root_of(obj)
+                    local key = usable(root) and full_name(root) or tostring(mesh)
+                    if not seen[key] then
+                        seen[key] = true
+                        -- only the hero's own weapons: every NPC carries one too, and those would
+                        -- only add noise
+                        local parent_name = full_name(try("GetAttachParent",
+                            function() return root:GetAttachParent() end))
+                        if parent_name == state.source_name or parent_name == carrier_name then
+                            local chain = attach_chain(obj, 4)
+                            if state.weapon_chain[key] ~= chain then
+                                state.weapon_chain[key] = chain
+                                local socket = socket_text_of(root)
+                                local socket_world = try("GetSocketLocation",
+                                    function() return source:GetSocketLocation(FName(socket)) end)
+                                local gap = distance(component_location(root), socket_world)
+                                trace(string.format(
+                                    "weapon chain: %-22s %s | root gap to socket %s", tostring(mesh),
+                                    chain, gap < math.huge and string.format("%.1f cm", gap) or "?"))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 
 local function bone_world_rot(component, name)
     local rotator = nil
@@ -1867,46 +2548,6 @@ local function report_materials(component)
     end
 end
 
--- Object path -> live object, cached. Only objects that already exist in memory resolve, which is
--- fine here: every material instance we name is referenced by the mesh itself, so it is loaded.
-local function resolve_material(path)
-    if state.material_cache == nil then state.material_cache = {} end
-    local cached = state.material_cache[path]
-    if usable(cached) then return cached end
-    local found = find_loaded(path)
-    if found then
-        state.material_cache[path] = found
-    end
-    return found
-end
-
--- The game's status system swaps the first material slot of the *head part* when the hero is hurt
--- (`Hun_Status/MI_ZeroHun_Head_Injured*`, seen in the log as
--- `material[0] MID_MI_ZeroHun_Head_Injured30_...`). Our mesh ships as that head part, so the dress
--- slot ended up rendering with a pale skin shader instead of its albedo - the "faded dress" bug.
--- Whatever the game puts in a guarded slot is replaced with the intended instance again.
-local function guard_materials(component)
-    local guard = config.material_guard
-    if type(guard) ~= "table" then return end
-    for index, path in pairs(guard) do
-        local want = resolve_material(path)
-        if want == nil then
-            if not state.guard_missing then
-                state.guard_missing = true
-                trace("material: cannot resolve " .. tostring(path))
-            end
-        else
-            local have = try("GetMaterial", function() return component:GetMaterial(index) end)
-            local have_name = usable(have) and full_name(have) or "<none>"
-            if have_name ~= full_name(want) then
-                local ok = pcall(function() component:SetMaterial(index, want) end)
-                trace(string.format("material: slot %d was %s -> restored %s (%s)", index,
-                    tostring(short_name(have_name)), tostring(short_name(path)),
-                    ok and "ok" or "FAILED"))
-            end
-        end
-    end
-end
 
 local function setup()
     if state.actor_name == nil then return end
@@ -2057,6 +2698,8 @@ local function setup()
         quiet_blank_parts()
     end
 
+    sweep_other_heroes()
+
     -- one-off census of how each weapon is attached, kept for future debugging of the anchoring
     if config.report_weapon_attachment and state.aligned then
         state.attach_checks = state.attach_checks or 0
@@ -2073,6 +2716,10 @@ local function setup()
     if config.attach_weapons and state.aligned then
         anchor_held_weapons()
     end
+
+    -- Logs the full attach chain whenever it changes (draw / sheathe / swap), with the gap between the
+    -- weapon's root and the socket it names.
+    watch_weapon_chain()
 
     if state.aligned then
         anchor_back_items()
@@ -2187,28 +2834,6 @@ local function setup()
     end
 end
 
--- True when the actor is the pawn the player actually controls. Cutscene / preview copies of the hero
--- exist as extra actors with the same part assets; those must never take over the retarget.
-local function is_player_pawn(actor_name)
-    if actor_name == nil then return false end
-    local controllers = try("FindAllOf PlayerController",
-        function() return FindAllOf("PlayerController") end)
-    if type(controllers) ~= "table" then return false end
-    for _, controller in pairs(controllers) do
-        if usable(controller) then
-            local pawn = try("K2_GetPawn", function() return controller:K2_GetPawn() end)
-            if not usable(pawn) then
-                pawn = try("GetControlledPawn",
-                    function() return controller:GetControlledPawn() end)
-            end
-            if not usable(pawn) then
-                pawn = try("GetPawn", function() return controller:GetPawn() end)
-            end
-            if usable(pawn) and full_name(pawn) == actor_name then return true end
-        end
-    end
-    return false
-end
 
 local function consider(obj)
     if obj == nil or not valid(obj) or is_cdo(obj) or is_our_body(obj) then return end
@@ -2220,14 +2845,23 @@ local function consider(obj)
     local actor = actor_of(obj)
     if actor == nil or is_cdo(actor) then return end
 
+    -- A level-sequence / preview actor never drives the mod: it carries the same part assets (so the
+    -- asset override makes it show Korinsna's mesh) but its animation belongs to the sequence.
+    local actor_key = full_name(actor)
+    if looks_like_copy(actor_key) then
+        push_log_once("seq|" .. tostring(actor_key),
+            "state: not adopting " .. tostring(short_name(actor_key)) .. " (sequence/preview actor)")
+        return
+    end
+
     -- A different hero actor usually means the game travelled / re-created him: every component we
     -- remember belongs to an object that is being destroyed, and using one of them crashed the game.
-    -- Copies of the hero that other systems spawn (sequences, character previews) are ignored while
-    -- the real player pawn is still alive.
-    local actor_key = full_name(actor)
+    -- The actor we already hold wins unless the new one is demonstrably the player's pawn.
     if state.actor_name ~= nil and actor_key ~= state.actor_name then
         if valid(state.actor) and not is_player_pawn(actor_key) then
-            trace("state: ignoring another hero copy " .. tostring(short_name(actor_key)))
+            push_log_once("other|" .. tostring(actor_key),
+                "state: keeping the current hero actor, ignoring " ..
+                tostring(short_name(actor_key)))
             return
         end
         reset_actor_state("the hero actor was re-created: " ..
@@ -2258,6 +2892,9 @@ local function scan()
         return
     end
     setup()
+    -- Runs whether or not the retarget is set up (see sweep_other_heroes): the prologue map plays as
+    -- the young hero, where the mod has no carrier of its own, but its cutscene copies still need this.
+    sweep_other_heroes()
 end
 
 -- Logs what the game is creating, then hands anything interesting to consider(). The log line is
@@ -2277,8 +2914,7 @@ local function inspect_new(obj)
     -- plus CharacterMesh0, and they are filtered properly when they are hidden.
     local component_name = short_name(full_name(obj))
     local queue_by_name = component_name ~= nil
-        and (component_name:sub(1, 4) == "mesh" or component_name:sub(1, 9) == "Character")
-    local queue_by_mesh = contains_any(name, config.hide_prefixes)
+        and (component_name:sub(1, 4) == "mesh" or component_name:sub(1, 9) == "Character")    local queue_by_mesh = contains_any(name, config.hide_prefixes)
         and not contains_any(name, config.keep_visible)
         and not is_carrier_mesh(name)
     if config.hide_parts and (queue_by_name or queue_by_mesh) then
@@ -2289,6 +2925,12 @@ local function inspect_new(obj)
             trace("hide: queued " .. tostring(component_name) .. " mesh=" .. tostring(name) ..
                 " owner=" .. tostring(actor_name))
         end
+    end
+
+    -- A hero copy spawned: the (rare, level-wide) sweep that lists its components has to run again.
+    -- Detecting it here keeps the sweep event driven instead of running every scan, which stuttered.
+    if hero_owned(actor_name) then
+        state.copy_dirty = true
     end
 
     -- only report components that actually draw something: the level creates thousands during load

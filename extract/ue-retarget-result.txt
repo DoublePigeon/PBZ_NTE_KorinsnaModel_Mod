@@ -1,5 +1,5 @@
 stale assets left: []
-could not delete /Game/Korinsna/IKR_Hun, moving it to /Game/KorinsnaStale/IKR_Hun_12
+could not delete /Game/Korinsna/IKR_Hun, moving it to /Game/KorinsnaStale/IKR_Hun_14
 created /Game/Korinsna/IKR_Hun -> /Game/Korinsna/IKR_Hun.IKR_Hun
 created /Game/Korinsna/IKR_Korinsna -> /Game/Korinsna/IKR_Korinsna.IKR_Korinsna
 sync ref pose: synced /Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton <- SK_Korinsna (bones 369 -> 369)

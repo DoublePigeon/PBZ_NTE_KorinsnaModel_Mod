@@ -28,9 +28,18 @@ HOST_HUN_TEX_DIR = "/Game/Test/Zero_LookDev/ZeroFile/Character/Hun/Head/Textures
 #   0 dress, 1 body/trims, 2 front hair, 3 back hair, 4 face, 5 eyebrow, 6 eyes, 7 highlight
 # Hair and face avoid MAI_Cloth (fabric weave detail) and MAI_Skin (subsurface colour map);
 # those two only land on small trims where they do not read.
+#
+# The dress and the skin (slots 0/1) must borrow material instances WITHOUT the fabric overlay.
+# Measured against the game's own look: `BaseColor Intensity` is the weight of the detail layer
+# (`DetailColor`), not an albedo strength - the hero's leather parts use Cloth_04 at 0.0 and are not
+# black, and Cloth_02 at 0.5 looks half fabric-noise. So:
+#   Cloth_04_b  intensity 0.0 -> pure albedo (lit cloth)          <- the dress
+#   Cloth_02_b  intensity 0.5 -> half albedo + half fabric noise  <- the (near-white) skin
+#   Cloth_05_b  intensity 1.0 -> the detail layer only (white)    <- the small white highlight bits
+# Only MIs with their own albedo texture can be used, one distinct albedo path per slot.
 SLOTS = [
-    "%s/MI_ZeroHun_Cloth_02_b" % HOST_MI_DIR,           # dress      (MAI_Cloth)
-    "%s/MI_ZeroHun_Cloth_04_b" % HOST_MI_DIR,           # body       (MAI_Cloth)
+    "%s/MI_ZeroHun_Cloth_04_b" % HOST_MI_DIR,           # dress      (MAI_Cloth, pure albedo)
+    "%s/MI_ZeroHun_Cloth_02_b" % HOST_MI_DIR,           # body       (MAI_Cloth)
     "%s/MI_ZeroHun_Cloth_03_b" % HOST_MI_DIR,           # front hair (MAI_Equipment)
     "%s/MI_ZeroHun_Cloth_01_b" % HOST_MI_DIR,           # back hair  (MAI_Equipment_Mask)
     "%s/MI_ZeroHun_Cap_01_b" % HOST_MI_DIR,             # face       (MAI_Equipment_Mask)
@@ -41,11 +50,12 @@ SLOTS = [
 
 # (folder, texture name, our tga, kind) - kind drives the sampler settings
 TEXTURES = [
-    # albedo: one distinct host texture per slot
+    # albedo: one distinct host texture per slot. The dress owns the Cloth_04 set (the only lit cloth
+    # instance with a pure albedo), the skin the Cloth_02 set, and the white highlight keeps Cloth_05.
     (HOST_TEX_DIR, "T_ZeroHun_Cloth_01_BC", "T_NPC_036_hair_02_d", "albedo"),
-    (HOST_TEX_DIR, "T_ZeroHun_Cloth_02_BC", "T_NPC_036_01_d", "albedo"),
+    (HOST_TEX_DIR, "T_ZeroHun_Cloth_02_BC", "T_NPC_036_02_d", "albedo"),
     (HOST_TEX_DIR, "T_ZeroHun_Cloth_03_BC", "T_NPC_036_hair_01_d", "albedo"),
-    (HOST_TEX_DIR, "T_ZeroHun_Cloth_04_BC", "T_NPC_036_02_d", "albedo"),
+    (HOST_TEX_DIR, "T_ZeroHun_Cloth_04_BC", "T_NPC_036_01_d", "albedo"),
     (HOST_TEX_DIR, "T_ZeroHun_Cloth_05_BC", "T_Korinsna_White", "albedo"),
     (HOST_TEX_DIR, "T_ZeroHun_Cap_V02_BC", "T_NPC_036_face_d", "albedo"),
     (HOST_HEAD_TEX_DIR, "T_ZeroHun_Head_D", "T_NPC_036_face_d", "albedo"),

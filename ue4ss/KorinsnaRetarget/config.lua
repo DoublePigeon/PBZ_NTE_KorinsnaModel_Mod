@@ -48,6 +48,20 @@ return {
         -- tuned on screen: 2 cm puts the hilt on the outside of the skirt without floating
         back_item_push_cm = 2.0,
         quiet_blank_parts = true,
+        -- re-arm the retarget when the game re-applies the leader pose (model stuck in its reference
+        -- pose after an interactive animation / cutscene)
+        pose_watchdog = true,
+        pose_stuck_scans = 4,
+        pose_move_threshold = 1.0,
+        pose_stuck_threshold = 0.05,
+        -- diagnostic: log which material instance each slot renders with, once per hero
+        report_materials = true,
+        -- the game's damage system replaces the *head part's* first material slot
+        -- (Hun_Status/MI_ZeroHun_Head_Injured*); our mesh ships as that head part, so the dress slot
+        -- must be put back or the dress renders with a pale skin shader
+        material_guard = {
+            [0] = "/Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/MI_ZeroHun_Cloth_04_b.MI_ZeroHun_Cloth_04_b",
+        },
         report_weapon_attachment = false,
         -- diagnostic run: measure the hand gap and each weapon's attach chain
         report_weapon_geometry = false,

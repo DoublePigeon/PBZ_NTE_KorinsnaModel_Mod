@@ -65,8 +65,9 @@ Lua 侧随后只要 `StaticFindObject("/Game/Korinsna/ABP_Korinsna_Retarget.ABP_
 绑定姿势——表现为「没有动画」。
 
 `SetLeaderPoseComponent(nil, true, true)` 清掉跟随关系后，post 实例才会被评估。
-`GetLeaderPoseComponent()` 在 5.7 里不是 BlueprintCallable，所以脚本每轮无条件调用一次清空
-（没有 leader 时是空操作）。
+`GetLeaderPoseComponent()` 在 5.7 里不是 BlueprintCallable，脚本**查不到**当前有没有被重新设上 leader，
+所以清空**每个组件只做一次**（每轮都清会不停重置姿势，模型卡在第一帧），
+另由 §6.17 的**姿势看门狗**在「游戏的身子动了、我们的没动」时补清一次。
 
 ### 2.4 不要自建组件
 
@@ -177,17 +178,20 @@ tex.set_editor_property("virtual_texture_streaming", True)   # 关键
 
 | 槽 | 部位 | 游戏材质实例 | 喂的贴图 |
 | --- | --- | --- | --- |
-| 0 | 连衣裙（含裙摆外层、靴饰） | `MI_ZeroHun_Cloth_02_b`（MAI_Cloth） | `T_NPC_036_01_d` |
-| 1 | 皮肤（腿、手）+ 腰带花饰 | `MI_ZeroHun_Cloth_04_b`（MAI_Cloth） | `T_NPC_036_02_d` |
+| 0 | 连衣裙（含裙摆外层、靴饰） | `MI_ZeroHun_Cloth_04_b`（MAI_Cloth，纯底色） | `T_NPC_036_01_d`（`T_ZeroHun_Cloth_04_BC`） |
+| 1 | 皮肤（腿、手）+ 腰带花饰 | `MI_ZeroHun_Cloth_02_b`（MAI_Cloth） | `T_NPC_036_02_d`（`T_ZeroHun_Cloth_02_BC`） |
 | 2 | 前发 / 发饰 | `MI_ZeroHun_Cloth_03_b`（MAI_Equipment） | `T_NPC_036_hair_01_d` |
 | 3 | 后长发 | `MI_ZeroHun_Cloth_01_b`（MAI_Equipment_Mask） | `T_NPC_036_hair_02_d` |
 | 4 | 脸 | `MI_ZeroHun_Cap_01_b`（MAI_Equipment_Mask） | `T_NPC_036_face_d` |
 | 5 | 眉毛 | `MI_ZeroHun_Head_Injured30`（MAI_Skin） | `T_NPC_036_face_d` |
 | 6 | 眼睛 | `MI_ZeroHun_Eye_01`（MA_EyeRefractive） | `T_NPC_036_eyes_d` |
-| 7 | 高光小件 | `MI_ZeroHun_Cloth_05_b`（MAI_Cloth） | 纯白 |
+| 7 | 高光小件 | `MI_ZeroHun_Cloth_05_b`（MAI_Cloth） | 纯白（`T_ZeroHun_Cloth_05_BC`） |
 
 头发和脸特意避开 `MAI_Cloth`（会叠加布料织纹细节法线）和 `MAI_Skin`（会叠加 SCMT 色图），
 这两个只留给面积很小、看不出来的部件。
+
+槽 0 / 槽 1 的实例是**可交换的**（两者都只有一个 albedo 贴图路径），要保证「一个槽一个独立贴图路径」。
+真正决定颜色对不对的不是这两个实例的差别，而是**游戏会不会在运行时把槽 0 换掉**——见 §6.18。
 
 编辑器里创建的占位 MI **不进包**（staging 时剔除）；一旦进包，游戏里人物会变成灰模/纯色。
 
@@ -282,6 +286,9 @@ IK 的隐含前提是「我们的手能够到魂的手」。实测两手间距�
 经典的**黑点闪烁**来源。现在对它们 `SetCastShadow(false)` + `SetRenderInMainPass(false)`
 （`quiet_blank_parts`），闪烁彻底消失。
 
+**只处理主角自己的组件**：这个函数一度遍历整个关卡的骨骼网格，把 NPC 和铃铛一起踢出 base pass
+（§6.15）。判据是 owner 是否为当前主角 Actor（`belongs_to_actor`）。
+
 ---
 
 ## 6. Bug 手册（现象 → 根因 → 修法）
@@ -357,6 +364,7 @@ IK 的隐含前提是「我们的手能够到魂的手」。实测两手间距�
 | --- | --- | --- |
 | 启动即 0xc0000005 | 覆盖了 `Hun_Skin_Skeleton`（即使骨骼同名同数量） | `stage_iostore.ps1` 的 drop 列表默认剔除 |
 | 一次性隐藏整套外观时崩溃 | 大量组件在同一帧被改状态 | 收集列表后**每次扫描只隐藏一个**，并逐个打日志 |
+| **传送 / 换图时偶发崩溃** | 换图时主角 Actor 被销毁重建，脚本仍持有旧 Actor 的组件（尤其 `state.body`），`setup()` 因此跳过初始化分支，直接对**已销毁的组件**调 `SetLeaderPoseComponent` 等 → 访问违规 | 用 `state.actor_name` 字符串做身份，Actor 变化时 `reset_actor_state()` 丢弃全部旧引用；`valid()` 改成「读不到有效性就当无效」；非玩家 Pawn 的主角副本忽略。见 §6.16 |
 | 打开 IK 相关 op 就崩 | 没有 goal/solver 却启用 `Retarget IK Goals` / `Run IK Rig` | 保持关闭 |
 | 反射写 1 字节枚举后崩溃 | UE4SS 用 4 字节 int 写进 1 字节字段，破坏相邻内存 | 只用原生 setter；必须写枚举时用 `Reflection():GetProperty()` + `ImportText` |
 
@@ -377,11 +385,111 @@ IK 的隐含前提是「我们的手能够到魂的手」。实测两手间距�
 
 ### 6.14 材质相关的失败尝试（不要再走）
 
-- **运行时 DMI 改 `OpacityMask`**：`CreateDynamicMaterialInstance` 在 Lua 里不可调用（日志上千次失败）。
+- **运行时 DMI 改参数**：`CreateDynamicMaterialInstance` 的 3 参数版在 Lua 里调不动；
+  单参数的 `CreateAndSetMaterialInstanceDynamic(index)` 能「成功」，但生成的是**别的材质**的实例
+  （日志里连衣裙槽拿到 `MID_MI_ZeroHun_Head_Injured30_xxx`），`Get/SetScalarParameterValue`
+  也读不回来。想改参数只能在资产层换实例，或者用 §6.18 的 `SetMaterial` 换**整个实例**。
 - **自建 MIC（以占位 MI 为父级）**：游戏里变成**纯色无贴图**。借壳对「网格槽」有效，
   对「材质实例的父级」无效。
 - **Mesh 的 LOD / 顶点色参与遮罩**：Korinsna 没有对应的顶点色，所以 `MAI_Cloth` 的织纹细节会显得
   像「布纹很脏」，头发和脸因此改用不带织纹的材质族。
+
+### 6.15 其他角色变黑 / 缺肢体，铃铛（存档点）模型与材质消失
+
+**根因：`quiet_blank_parts` 与 `hide_scabbards` 在扫全关卡。**
+
+这两个函数原本用 `FindAllOf("SkeletalMeshComponent")` 遍历**世界里所有**骨骼网格组件：
+
+- `quiet_blank_parts` 对「不是承载网格、不是原身体、不是武器」的每个组件都调
+  `SetRenderInMainPass(false)` + `SetCastShadow(false)`。NPC、场景铃铛
+  （`StoneCrane_Bell_Skin`、`WoodenFrameBellWithCloth` 等存档点）**也是骨骼网格**，
+  于是整关卡的非主角骨骼网格全部退出 base pass：轻则黑剪影 / 缺肢体，重则整个模型不见。
+- `hide_scabbards` 同理：按 mesh 名里有没有 `scab` 直接隐藏，NPC 的刀鞘一起陪葬。
+
+**修法：** 两处都只处理**主角自己的组件**——
+`belongs_to_actor(组件, state.actor_name)`（owner 就是主角 Actor）或 `attached_to_hero(组件)`
+（挂接链最终落到主角的身体 / 承载组件上）。组件列表**每个主角只收集一次**
+（`state.quiet_parts`，每 20 次扫描刷新一次），之后每轮只对缓存里的组件重设标志
+（游戏的衣柜系统会改回来）。
+
+### 6.16 传送 / 换图时崩溃
+
+**根因：换图时主角 Actor 被销毁重建，脚本里的组件引用全部失效。**
+
+日志证据：两次崩溃（`crash_2026_11_02_23_24_29` / `23_44_49`）都发生在
+「新地图里的 `BP_Renewal_Hun_C` 刚被创建」的那一秒，且都停在
+`source: VisibilityBasedAnimTickOption = 0` 之后、`hide: carrier=` 之前——也就是进了 `setup()`
+却**没进首次初始化分支**（因为 `state.body` 还指着上一个 Actor 的 meshhead），随后
+`drive_carrier(target)` 对**正在被销毁的组件**调引擎函数 → 0xc0000005。
+
+**修法：**
+
+1. 用 `state.actor_name`（字符串）当身份。`consider()` 发现新组件属于**另一个** Actor 时先
+   `reset_actor_state()`：source / carrier / body / 对齐状态 / 缓存 / 材质守卫…全部丢弃；
+2. `setup()` 开头加「陈旧状态闸门」：Actor 不 valid，或 source/carrier 的 owner 不再是
+   `state.actor_name` → 只重置、不碰组件；
+3. `valid()` 改成严格版：**读不到 `IsValid()` 就当作无效**（原来「读不到就当有效」正是崩溃的直接原因）；
+4. 过场 / 预览会额外生成「主角副本」，用 `PlayerController:K2_GetPawn()` 认出真正的玩家 Pawn，
+   副本一律忽略（否则会把状态切到副本上）。
+
+### 6.17 交互动画之后模型变默认姿势（重启才恢复）
+
+**根因：游戏重新给部件组件设了 leader pose。** 交互 / 过场会让游戏重建主角部件，
+`meshhead` 重新以 `CharacterMesh0` 为 leader pose 源；跟随者组件**不评估自己的动画**，
+post-process 重定向图也就不跑，网格回落到**参考姿势**（看着就是「默认姿势」）。
+脚本只在「首次见到该组件」时清过一次 leader pose（每轮清会让姿势卡在第一帧），之后再也不清。
+
+**修法：姿势看门狗（`watch_pose`，每轮扫描）**
+
+- 同时采样原身体与我们的「骨盆→右手」向量（组件空间，走路不影响判定）；
+- 原身体在动（> `pose_move_threshold` cm）而我们的向量不动（< `pose_stuck_threshold` cm）
+  连续 `pose_stuck_scans` 次 → 判定卡住；
+- 补一次 `SetLeaderPoseComponent(nil, true, true)` + `SetEnableAnimation(true)` +
+  `SetDisablePostProcessBlueprint(false)`，并打印当时的 anim / animclass / post 实例名；
+  之后有 `pose_heal_cooldown` 冷却，避免变成重置循环。
+
+### 6.18 衣服颜色发白 / 像褪色（真正的元凶：游戏换掉了槽 0 的材质）
+
+**现象**：红裙子在游戏里是一块米白色布料，但同一个材质里的蝴蝶结、宝石、发饰颜色都正常。
+
+**根因**：日志里的一行
+
+```
+material[0] MID_MI_ZeroHun_Head_Injured30_2147474746
+```
+
+——槽 0 的材质是一个**父级为 `Hun_Status/MI_ZeroHun_Head_Injured30` 的动态实例**，
+这个实例**不是脚本创建的**。原因是我们的模型占用了「头部部件」`SkinParts/Hun_Head_New` 这个资产，
+而游戏的**受伤 / 状态系统**会把头部部件的第 0 号材质槽换成受伤皮肤材质（`Hun_Status` 目录下的
+`MI_ZeroHun_Head_Injured*`、`Head_health`）。于是连衣裙槽套上了偏白的皮肤着色器：
+底色被皮肤 SSS / SCMT 洗白，而其它槽（发 / 脸 / 眼 / 高光）没被动过，所以那些小件颜色正常。
+
+> 排查过程中走过两条错路，记下来避免重犯：
+> - 以为是「布料叠加层」`BaseColor Intensity`（`Cloth_02_b` = 0.5、`Cloth_05_b` = 1.0）
+>   把饱和度冲淡了，换了三次槽 0 的材质实例、重新 cook 两次，游戏里看不出任何差别——
+>   **因为每次都被游戏换回受伤材质**；
+> - 以为贴图和 UV 不匹配，用 Blender 按 UV 采样 + 平面渲染对比过 `T_NPC_036_01_d` / `_02_d`，
+>   结果证明原映射是对的（红裙 + 皮肤都对）。判断「贴图/UV 有没有错」用这个方法很快。
+
+**修法：材质守卫（`guard_materials`，每轮扫描）**
+
+```lua
+material_guard = {
+    [0] = "/Game/PBZContent/Characters/Hero/Hun_New_V2b/Material/MI_ZeroHun_Cloth_04_b.MI_ZeroHun_Cloth_04_b",
+},
+```
+
+- 用 `StaticFindObject` 拿到目标材质实例（它一定已被网格引用、必在内存里），缓存；
+- 每轮 `GetMaterial(0)` 比较对象名，不一致就 `SetMaterial(0, 目标)`，并写日志；
+- 实测游戏只在初始化时换一次，守卫命中一次之后就不再触发（日志里只有 1 行 `material: slot 0 was ...`）。
+
+要点：
+
+- `UMeshComponent::SetMaterial(int32, UMaterialInterface*)` 是 BlueprintCallable，**能换整个实例**；
+  「改参数」不行（见 §6.14），「换实例」可以。
+- 守卫的目标实例必须与资产里给该槽的实例一致，否则采到的 albedo 会变成**另一个槽的贴图**
+  （每个实例只有一个 albedo 路径）。
+- 以后如果发现别的槽也被换掉（例如重伤时），往 `material_guard` 里加一条即可。
 
 ---
 
@@ -397,11 +505,15 @@ IK 的隐含前提是「我们的手能够到魂的手」。实测两手间距�
 | `hide_source_visibility` | `true` | 隐藏原身体（姿势照常 tick） |
 | `force_anim_refresh` | `true` | 强制 `AlwaysTickPoseAndRefreshBones` + 关 URO |
 | `hide_scabbards` | `true` | 隐藏会乱飞的刀鞘（`back_items` 除外） |
-| `quiet_blank_parts` | `true` | 空白部件移出阴影/主通道 |
+| `quiet_blank_parts` | `true` | 空白部件移出阴影/主通道（**只处理主角自己的组件**，见 §6.15） |
 | `carrier_cast_shadow` | `false` | 承载网格不投影（避免黑斑） |
 | `attach_weapons` | `true` | 把手持武器 Actor 对齐到我们的手骨 |
 | `grip_distance` | `{ r=6.0, l=6.0 }` | 握点距手骨的距离（cm），0 = 保持游戏值 |
 | `back_items` / `back_item_push_cm` | `Hun_Knife` + 刀鞘 / `2.0` | 腰后短刀锚到骨盆并外推 |
+| `pose_watchdog` | `true` | 姿势卡住（游戏重设 leader pose）时补清一次，见 §6.17 |
+| `pose_stuck_scans` / `pose_move_threshold` / `pose_stuck_threshold` / `pose_heal_cooldown` | `4` / `1.0` / `0.05` / `20` | 看门狗阈值（扫描次数 / cm / cm / 冷却扫描数） |
+| `material_guard` | `[0] = ".../MI_ZeroHun_Cloth_04_b"` | 被游戏换掉的材质槽，每轮把目标实例换回去，见 §6.18 |
+| `report_materials` | `false` | 打印 8 个槽实际使用的材质实例名（排障，见 §6.18） |
 | `rescan_interval` | `0.5` | 扫描周期（秒） |
 | `probe_only` | `false` | 只观察、不改动 |
 | `report_weapon_geometry` | `false` | 武器/手骨几何普查（排障用） |
@@ -435,6 +547,23 @@ motion: source pelvis->hand (23.9, -25.8, -9.4) | ours pelvis->hand (15.9, -20.4
 可以直接看出残留部件属于谁。组件身份一律用**完整对象名**比对，不要用网格资源名
 （构造中的组件经常读回 nil，会把自己的网格误判成原版部件）。
 
+### 8.4 判断「材质是不是被游戏换掉了」
+
+打开 `report_materials`，会打印 8 个槽实际使用的实例：
+
+```
+material[0] MI_ZeroHun_Cloth_04_b
+material[0] was MID_MI_ZeroHun_Head_Injured30_2147474746 -> restored ...
+```
+
+- 槽里出现 `MID_...` 且父级不是我们指定的实例 → 游戏在运行时换了材质（§6.18）；
+- `material: slot N was ... -> restored ...` 是守卫生效的那一行，正常情况下**只会出现一次**。
+
+### 8.5 判断「贴图和 UV 对不对」（不用进游戏）
+
+Blender 里按多边形 UV 采样 tga，或者直接给每个材质槽套一个「贴图 → Emission」的平面材质渲染一张，
+和参考图对照即可。这条比在游戏里反复换材质快得多，也是这次排除「褪色是贴图/UV 问题」的方法（§6.18）。
+
 ---
 
 ## 9. 附录：已废弃的「重新蒙皮到游戏骨架」路线
@@ -457,6 +586,8 @@ motion: source pelvis->hand (23.9, -25.8, -9.4) | ours pelvis->hand (15.9, -20.4
 | 裙摆 | 刚体（不参与重定向） | 换成 Chaos Cloth，或用正确的骨骼映射重新做链 |
 | 扭转骨轴向限制 | 未实现（IK Retargeter 只有链级模式） | 在 ABP 里加约束节点，只保留绕骨轴的旋转 |
 | 衣服质感 | 中性 ARM：全粗糙、非金属 | 想要一点高光时把 `_ARM` 的 G 改成 180（参考 2B mod 的值） |
+| 皮肤颜色 | 可琳思娜的腿/手本来就接近白色，槽 1 借的 `Cloth_02_b` 会再混一点布料噪点 | 想更干净时把槽 1 也换成纯底色实例（要同时换它唯一的 albedo 贴图路径） |
+| 游戏换材质 | 只守住槽 0（受伤头材质） | 若重伤/其它状态还会换别的槽，往 `material_guard` 里加条目 |
 | 武器握点 | 手骨距离按左手/右手各一个常数 | 按武器类型细分（斧/刀/钩的握点不同） |
 | 披风/长发物理 | 已清空（外观隐藏的代价） | 若要恢复，需要在 Korinsna 自己骨架上重建布料资产 |
 | 阴影 | 承载网格不投影（避免黑斑） | 修好 retargeted mesh 的深度 pass 后可以打开 |

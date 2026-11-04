@@ -6,12 +6,16 @@
 #   build_all.ps1 -SkipAssets  reuse the assets already in the project
 #   build_all.ps1 -SkipCook    reuse the previous cook
 #   build_all.ps1 -NoInstall   leave the output in dist/ only
+#   build_all.ps1 -Profile dev install the dev flavour of the Lua mod (verbose log + diagnostics)
+#   build_all.ps1 -SkipRelease do not refresh Release\KorinsnaModel + Release\KorinsnaRetarget
 param(
     [switch]$SkipCpp,
     [switch]$SkipAssets,
     [switch]$SkipCook,
     [switch]$NoInstall,
-    [string]$Name = "ProjectPBZ-Korinsna-Windows_P"
+    [switch]$SkipRelease,
+    [string]$Name = "ProjectPBZ-Korinsna-Windows_P",
+    [ValidateSet("release", "dev")][string]$Profile = "release"
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,8 +74,17 @@ if (-not (Test-Path (Join-Path $dist "$Name.utoc"))) { throw "stage failed, see 
 
 # ---------------------------------------------------------------- install
 if (-not $NoInstall) {
-    Write-Host "== install"
-    & (Join-Path $root "tools\install_mod.ps1") -Name $Name | Out-Host
+    Write-Host "== install ($Profile flavour)"
+    & (Join-Path $root "tools\install_mod.ps1") -Name $Name -Profile $Profile | Out-Host
+}
+
+# ---------------------------------------------------------------- release folders
+# The two halves in one place, ready to hand out (see tools/make_release.ps1). The checks are skipped
+# here: this runs right after a full build, and a failing check must not make an installed build look
+# like it succeeded.
+if (-not $SkipRelease) {
+    Write-Host "== release folders"
+    & (Join-Path $root "tools\make_release.ps1") -RepoRoot $root -Name $Name -SkipChecks | Out-Host
 }
 
 Write-Host "== done"

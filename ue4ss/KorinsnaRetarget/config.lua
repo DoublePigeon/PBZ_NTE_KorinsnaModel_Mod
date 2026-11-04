@@ -71,27 +71,42 @@ return {
         hide_hero_cloth = true,
         -- everything else a copy owns (accessories, static-mesh cards, grooms) is hidden too
         hide_copy_outfit = true,
-        -- the sweep that finds those components walks the whole level, so it runs rarely: event driven
-        -- when a new hero copy component appears, plus this many scans as a safety net, and never more
-        -- often than copy_rescan_min_scans (a cutscene spawns components continuously)
+        -- the sweep that finds those components walks the whole level (five component classes), so it
+        -- runs rarely: every `copy_rescan_scans`, the moment a hero-owned component spawns (the object
+        -- listener sets `copy_dirty`), or when a cached one went away - never more often than
+        -- `copy_rescan_min_scans`, because a cutscene spawns components continuously.
         copy_rescan_scans = 60,
         copy_rescan_min_scans = 4,
-        -- re-arm the retarget when the game re-applies the leader pose (model stuck in its reference
-        -- pose after an interactive animation / cutscene)
+        -- re-arm the retarget when the game points the part component back at CharacterMesh0 (the
+        -- model falling back to its reference pose after an interactive animation). See watch_pose():
+        -- the leader pose pointer is read directly, so this reacts on the next scan.
         pose_watchdog = true,
+        -- The bone-motion window is the slow backstop (it needs a window to be sure); the leader-pose
+        -- read normally fires first. Kept on: 4 bone reads per scan, and it is the only thing that
+        -- catches a stall neither of the two state checks explains.
+        pose_bone_fallback = true,
         -- Each scan is classified as "stalled" when the game's body moved more than
-        -- pose_step_move_cm while Korinsna moved less than pose_step_stuck_cm. The verdict is taken
+        -- pose_step_move_cm while Korinsna moved less than pose_step_stuck_cm; the verdict is taken
         -- over a sliding window (pose_slip_window) because one bad read-out can otherwise look like
-        -- motion and hide a stall.
+        -- motion and hide a stall. Only used when pose_bone_fallback is on.
         pose_step_move_cm = 0.5,
         pose_step_stuck_cm = 0.3,
         pose_slip_window = 12,
         pose_stuck_marks = 4,
-        -- minimum scans between two heals (0.5 s each), so an unrelated frozen pose cannot turn this
-        -- into a re-init loop
+        -- A single scan where the game's body moved more than this while ours did not move at all is a
+        -- stall straight away (measured 98.8 cm in one scan the moment the pose was lost). Set it very
+        -- high to disable the fast path and rely on the window above only.
+        pose_big_jump_cm = 20.0,
+        -- minimum scans between two rebuilds of the retarget graph (0.5 s each)
         pose_heal_cooldown = 6,
+        -- scans to wait after a heal before the held weapons are anchored again (the hand bone has to
+        -- be on a live pose first, or the wrong offset gets baked into the weapon)
+        pose_weapon_wait = 2,
         -- diagnostic: print the watchdog counters every 5 scans
         report_pose_window = false,
+        -- diagnostic: pelvis/foot heights of the game's body vs ours (used to find the floating
+        -- sit/lie bug, see §8.9). Turn on to measure, keep off: it logs a line per second.
+        report_ground_every = 0,
         -- diagnostic: log which material instance each slot renders with, once per hero
         report_materials = false,
         -- the game's damage system replaces the *head part's* first material slot
@@ -109,10 +124,26 @@ return {
     -- extra yaw applied on top of the measured alignment, for fine tuning without a rebuild
     rotation_offset_yaw = 0.0,
 
+    -- 0 = nothing written, 1 = problems only (release: a healthy session writes no log at all),
+    -- 2 = everything (dev). Each line is a file write plus a console print; a chatty log is real work
+    -- during a cutscene, which is why release keeps this at 1.
+    log_level = 1,
+
+    -- Scans between two level-wide searches for the components the per-scan work acts on (weapons,
+    -- scabbards, Hun's waist knife). ONE search per scan replaces the three that the three jobs used to
+    -- run separately; the hits are cached as names and the work then runs over those.
+    target_rescan_scans = 1,
+    -- scans between two attempts to find the hero while he is still unknown, and between two audit
+    -- look-ups once he is known (the object listener normally makes both unnecessary)
+    discover_every = 4,
+    discover_audit_scans = 60,
+    -- re-assert the blank-part shadow flags every N scans (the game's wardrobe pass turns parts back on)
+    quiet_parts_every = 2,
+
     -- log a bone position of both rigs every N scans (0 disables): tells "frozen pose" apart from
     -- "wrong pose" without needing another build. Component space, so walking does not count as
-    -- animation.
-    report_motion_every = 2,
+    -- animation. Diagnostic: off in release.
+    report_motion_every = 0,
 
     toggle_key = "F9",
     diagnostics_key = "F11",

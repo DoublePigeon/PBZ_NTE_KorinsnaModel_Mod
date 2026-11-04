@@ -1,21 +1,126 @@
 stale assets left: []
-could not delete /Game/Korinsna/IKR_Hun, moving it to /Game/KorinsnaStale/IKR_Hun_14
+could not delete /Game/Korinsna/IKR_Hun, moving it to /Game/KorinsnaStale/IKR_Hun_23
 created /Game/Korinsna/IKR_Hun -> /Game/Korinsna/IKR_Hun.IKR_Hun
 created /Game/Korinsna/IKR_Korinsna -> /Game/Korinsna/IKR_Korinsna.IKR_Korinsna
 sync ref pose: synced /Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton <- SK_Korinsna (bones 369 -> 369)
-chains: source=9 target=9 of 28
+chains: source=49 target=49 of 58 (9 not retargeted)
 created /Game/Korinsna/RTG_HunToKorinsna -> /Game/Korinsna/RTG_HunToKorinsna.RTG_HunToKorinsna
 ops after set_ik_rig: 6
 ops after assign_ik_rig_to_all_ops: 6
-ops after auto_map_chains: 6
-auto_align_all_bones(target) = None
-disabled ops: ['Retarget IK Goals', 'Run IK Rig', 'Remap Curves']
+chains mapped explicitly: 49 of 49
+ops after chain mapping: 6
+  op[00] Pelvis Motion          chains=n/a
+  op[01] FK Chains              chains=[Root,Spine,Neck,LeftClavicle,RightClavicle,LeftArmUpper,LeftArmLower,LeftThigh,LeftCalf,LeftFoot,LeftToe,RightArmUpper,RightArmLower,RightHand,LeftHand,RightThigh,RightCalf,RightFoot,RightToe,LeftThumb1,LeftThumb2,LeftThumb3,LeftIndex1,LeftIndex2,LeftIndex3,LeftMiddle1,LeftMiddle2,LeftMiddle3,LeftRing1,LeftRing2,LeftRing3,LeftPinky1,LeftPinky2,LeftPinky3,RightThumb1,RightThumb2,RightThumb3,RightIndex1,RightIndex2,RightIndex3,RightMiddle1,RightMiddle2,RightMiddle3,RightRing1,RightRing2,RightRing3,RightPinky1,RightPinky2,RightPinky3]
+  op[02] Retarget IK Goals      chains=[]
+  op[03] Run IK Rig             chains=n/a
+  op[04] Root Motion            chains=n/a
+  op[05] Remap Curves           chains=n/a
+  align Root           1 bone(s): Root
+  align Spine          2 bone(s): Bip001-Spine, Bip001-Spine1
+  align Neck           1 bone(s): Bip001-Neck
+  align LeftClavicle   1 bone(s): Bip001-L-Clavicle
+  align RightClavicle  1 bone(s): Bip001-R-Clavicle
+  align LeftArmUpper   3 bone(s): Bip001-L-UpperArm, Bone-L-UpperArm-Twist, Bone-L-UpperArm-Twist1
+  align LeftArmLower   3 bone(s): Bip001-L-Forearm, Bone-L-ForeArm-Twist, Bone-L-ForeArm-Twist1
+  align LeftThigh      3 bone(s): Bip001-L-Thigh, Bone-L-Thigh-Twist, Bone-L-Thigh-Twist1
+  align LeftCalf       3 bone(s): Bip001-L-Calf, Bone-L-Calf-Twist, Bone-L-Calf-Twist1
+  align LeftFoot       1 bone(s): Bip001-L-Foot
+  align LeftToe        1 bone(s): Bip001-L-Toe0
+  align RightArmUpper  3 bone(s): Bip001-R-UpperArm, Bone-R-UpperArm-Twist, Bone-R-UpperArm-Twist1
+  align RightArmLower  3 bone(s): Bip001-R-Forearm, Bone-R-ForeArm-Twist, Bone-R-ForeArm-Twist1
+  align RightHand      1 bone(s): Bip001-R-Hand
+  align LeftHand       1 bone(s): Bip001-L-Hand
+  align RightThigh     3 bone(s): Bip001-R-Thigh, Bone-R-Thigh-Twist, Bone-R-Thigh-Twist1
+  align RightCalf      3 bone(s): Bip001-R-Calf, Bone-R-Calf-Twist, Bone-R-Calf-Twist1
+  align RightFoot      1 bone(s): Bip001-R-Foot
+  align RightToe       1 bone(s): Bip001-R-Toe0
+  align LeftThumb1     1 bone(s): Bip001-L-Finger0
+  align LeftThumb2     1 bone(s): Bip001-L-Finger01
+  align LeftThumb3     1 bone(s): Bip001-L-Finger02
+  align LeftIndex1     1 bone(s): Bip001-L-Finger1
+  align LeftIndex2     1 bone(s): Bip001-L-Finger11
+  align LeftIndex3     1 bone(s): Bip001-L-Finger12
+  align LeftMiddle1    1 bone(s): Bip001-L-Finger2
+  align LeftMiddle2    1 bone(s): Bip001-L-Finger21
+  align LeftMiddle3    1 bone(s): Bip001-L-Finger22
+  align LeftRing1      1 bone(s): Bip001-L-Finger3
+  align LeftRing2      1 bone(s): Bip001-L-Finger31
+  align LeftRing3      1 bone(s): Bip001-L-Finger32
+  align LeftPinky1     1 bone(s): Bip001-L-Finger4
+  align LeftPinky2     1 bone(s): Bip001-L-Finger41
+  align LeftPinky3     1 bone(s): Bip001-L-Finger42
+  align RightThumb1    1 bone(s): Bip001-R-Finger0
+  align RightThumb2    1 bone(s): Bip001-R-Finger01
+  align RightThumb3    1 bone(s): Bip001-R-Finger02
+  align RightIndex1    1 bone(s): Bip001-R-Finger1
+  align RightIndex2    1 bone(s): Bip001-R-Finger11
+  align RightIndex3    1 bone(s): Bip001-R-Finger12
+  align RightMiddle1   1 bone(s): Bip001-R-Finger2
+  align RightMiddle2   1 bone(s): Bip001-R-Finger21
+  align RightMiddle3   1 bone(s): Bip001-R-Finger22
+  align RightRing1     1 bone(s): Bip001-R-Finger3
+  align RightRing2     1 bone(s): Bip001-R-Finger31
+  align RightRing3     1 bone(s): Bip001-R-Finger32
+  align RightPinky1    1 bone(s): Bip001-R-Finger4
+  align RightPinky2    1 bone(s): Bip001-R-Finger41
+  align RightPinky3    1 bone(s): Bip001-R-Finger42
+aligned 49 chain(s), retarget pose saved
   op[00] Pelvis Motion          enabled=True
   op[01] FK Chains              enabled=True
   op[02] Retarget IK Goals      enabled=False
   op[03] Run IK Rig             enabled=False
   op[04] Root Motion            enabled=True
   op[05] Remap Curves           enabled=False
+  Root             enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=GLOBALLY_SCALED: 1> transA=1.00
+  Spine            enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  Neck             enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftClavicle     enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightClavicle    enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftArmUpper     enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftArmLower     enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftThigh        enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftCalf         enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftFoot         enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftToe          enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightArmUpper    enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightArmLower    enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightHand        enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftHand         enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightThigh       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightCalf        enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightFoot        enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightToe         enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftThumb1       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftThumb2       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftThumb3       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftIndex1       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftIndex2       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftIndex3       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftMiddle1      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftMiddle2      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftMiddle3      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftRing1        enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftRing2        enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftRing3        enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftPinky1       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftPinky2       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  LeftPinky3       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightThumb1      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightThumb2      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightThumb3      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightIndex1      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightIndex2      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightIndex3      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightMiddle1     enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightMiddle2     enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightMiddle3     enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightRing1       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightRing2       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightRing3       enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightPinky1      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightPinky2      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+  RightPinky3      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
+FK chain settings applied to 49 chain(s)
 chains without a source mapping: none
 anim blueprint created=True
   generated class=/Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C

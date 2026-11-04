@@ -10,16 +10,56 @@ source retarget root=pelvis
   op[03] Run IK Rig               enabled=False
   op[04] Root Motion              enabled=True
   op[05] Remap Curves             enabled=False
-chain map (9 entries):
+chain map (49 entries):
   Root             <- Root            
   Spine            <- Spine           
   Neck             <- Neck            
   LeftClavicle     <- LeftClavicle    
   RightClavicle    <- RightClavicle   
-  LeftArm          <- LeftArm         
-  RightArm         <- RightArm        
-  LeftLeg          <- LeftLeg         
-  RightLeg         <- RightLeg        
+  LeftArmUpper     <- LeftArmUpper    
+  LeftArmLower     <- LeftArmLower    
+  LeftThigh        <- LeftThigh       
+  LeftCalf         <- LeftCalf        
+  LeftFoot         <- LeftFoot        
+  LeftToe          <- LeftToe         
+  RightArmUpper    <- RightArmUpper   
+  RightArmLower    <- RightArmLower   
+  RightHand        <- RightHand       
+  LeftHand         <- LeftHand        
+  RightThigh       <- RightThigh      
+  RightCalf        <- RightCalf       
+  RightFoot        <- RightFoot       
+  RightToe         <- RightToe        
+  LeftThumb1       <- LeftThumb1      
+  LeftThumb2       <- LeftThumb2      
+  LeftThumb3       <- LeftThumb3      
+  LeftIndex1       <- LeftIndex1      
+  LeftIndex2       <- LeftIndex2      
+  LeftIndex3       <- LeftIndex3      
+  LeftMiddle1      <- LeftMiddle1     
+  LeftMiddle2      <- LeftMiddle2     
+  LeftMiddle3      <- LeftMiddle3     
+  LeftRing1        <- LeftRing1       
+  LeftRing2        <- LeftRing2       
+  LeftRing3        <- LeftRing3       
+  LeftPinky1       <- LeftPinky1      
+  LeftPinky2       <- LeftPinky2      
+  LeftPinky3       <- LeftPinky3      
+  RightThumb1      <- RightThumb1     
+  RightThumb2      <- RightThumb2     
+  RightThumb3      <- RightThumb3     
+  RightIndex1      <- RightIndex1     
+  RightIndex2      <- RightIndex2     
+  RightIndex3      <- RightIndex3     
+  RightMiddle1     <- RightMiddle1    
+  RightMiddle2     <- RightMiddle2    
+  RightMiddle3     <- RightMiddle3    
+  RightRing1       <- RightRing1      
+  RightRing2       <- RightRing2      
+  RightRing3       <- RightRing3      
+  RightPinky1      <- RightPinky1     
+  RightPinky2      <- RightPinky2     
+  RightPinky3      <- RightPinky3     
 anim blueprint /Game/Korinsna/ABP_Korinsna_Retarget
   target skeleton=/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton
   generated class=/Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C

@@ -3,7 +3,7 @@ asset=/Game/Korinsna/SK_Korinsna
 skeleton=/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton
 bones=369
 materials=8
-bounds origin (-0.20, -7.49, 86.88) extent (42.56, 30.58, 86.84)
+bounds origin (-0.40, -7.49, 86.88) extent (44.39, 30.58, 86.84)
 bounds min z = 0.04  max z = 173.72
   Root               [0.0, 0.0, 0.0]
   Bip001-Pelvis      [-0.0, 1.5008, 94.7244]

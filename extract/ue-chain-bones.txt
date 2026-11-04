@@ -1,0 +1,59 @@
+target bones=369 source bones=1171
+
+Root  retarget=True  rot=default trans=GloballyScaled
+  source Root..Root  (0 bones)
+    
+  target Root..Root  (0 bones)
+    
+
+Spine  retarget=True  rot=default trans=default
+  source pelvis..spine_05  (6 bones)
+    pelvis -> spine_01 -> spine_02 -> spine_03 -> spine_04 -> spine_05
+  target Bip001-Pelvis..Bip001-Spine1  (3 bones)
+    Bip001-Pelvis -> Bip001-Spine -> Bip001-Spine1
+
+Neck  retarget=True  rot=default trans=default
+  source neck_01..neck_02  (2 bones)
+    neck_01 -> neck_02
+  target Bip001-Neck..Bip001-Neck  (0 bones)
+    
+
+LeftClavicle  retarget=True  rot=default trans=default
+  source clavicle_l..clavicle_l  (0 bones)
+    
+  target Bip001-L-Clavicle..Bip001-L-Clavicle  (0 bones)
+    
+
+RightClavicle  retarget=True  rot=default trans=default
+  source clavicle_r..clavicle_r  (0 bones)
+    
+  target Bip001-R-Clavicle..Bip001-R-Clavicle  (0 bones)
+    
+
+LeftArm  retarget=True  rot=default trans=default
+  source upperarm_l..hand_l  (3 bones)
+    upperarm_l -> lowerarm_l -> hand_l
+  target Bip001-L-UpperArm..Bip001-L-Hand  (7 bones)
+    Bip001-L-UpperArm -> Bone-L-UpperArm-Twist -> Bone-L-UpperArm-Twist1 -> Bip001-L-Forearm -> Bone-L-ForeArm-Twist -> Bone-L-ForeArm-Twist1 -> Bip001-L-Hand
+  twist-like bones inside the target chain: Bone-L-UpperArm-Twist, Bone-L-UpperArm-Twist1, Bone-L-ForeArm-Twist, Bone-L-ForeArm-Twist1
+
+RightArm  retarget=True  rot=default trans=default
+  source upperarm_r..hand_r  (3 bones)
+    upperarm_r -> lowerarm_r -> hand_r
+  target Bip001-R-UpperArm..Bip001-R-Hand  (7 bones)
+    Bip001-R-UpperArm -> Bone-R-UpperArm-Twist -> Bone-R-UpperArm-Twist1 -> Bip001-R-Forearm -> Bone-R-ForeArm-Twist -> Bone-R-ForeArm-Twist1 -> Bip001-R-Hand
+  twist-like bones inside the target chain: Bone-R-UpperArm-Twist, Bone-R-UpperArm-Twist1, Bone-R-ForeArm-Twist, Bone-R-ForeArm-Twist1
+
+LeftLeg  retarget=True  rot=default trans=default
+  source thigh_l..ball_l  (4 bones)
+    thigh_l -> calf_l -> foot_l -> ball_l
+  target Bip001-L-Thigh..Bip001-L-Toe0  (8 bones)
+    Bip001-L-Thigh -> Bone-L-Thigh-Twist -> Bone-L-Thigh-Twist1 -> Bip001-L-Calf -> Bone-L-Calf-Twist -> Bone-L-Calf-Twist1 -> Bip001-L-Foot -> Bip001-L-Toe0
+  twist-like bones inside the target chain: Bone-L-Thigh-Twist, Bone-L-Thigh-Twist1, Bone-L-Calf-Twist, Bone-L-Calf-Twist1
+
+RightLeg  retarget=True  rot=default trans=default
+  source thigh_r..ball_r  (4 bones)
+    thigh_r -> calf_r -> foot_r -> ball_r
+  target Bip001-R-Thigh..Bip001-R-Toe0  (8 bones)
+    Bip001-R-Thigh -> Bone-R-Thigh-Twist -> Bone-R-Thigh-Twist1 -> Bip001-R-Calf -> Bone-R-Calf-Twist -> Bone-R-Calf-Twist1 -> Bip001-R-Foot -> Bip001-R-Toe0
+  twist-like bones inside the target chain: Bone-R-Thigh-Twist, Bone-R-Thigh-Twist1, Bone-R-Calf-Twist, Bone-R-Calf-Twist1

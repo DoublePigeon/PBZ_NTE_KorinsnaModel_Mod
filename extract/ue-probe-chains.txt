@@ -1,0 +1,36 @@
+=== /Game/Korinsna/IKR_Hun
+  chain count: 15
+    Root                   <Struct 'BoneReference' (0x00000207E460F9CC) {}> .. <Struct 'BoneReference' (0x00000207E460F9E0) {}>
+    Spine                  <Struct 'BoneReference' (0x00000207E460F30C) {}> .. <Struct 'BoneReference' (0x00000207E460F320) {}>
+    Neck                   <Struct 'BoneReference' (0x00000207E460FA8C) {}> .. <Struct 'BoneReference' (0x00000207E460FAA0) {}>
+    LeftClavicle           <Struct 'BoneReference' (0x00000207E460FA4C) {}> .. <Struct 'BoneReference' (0x00000207E460FA60) {}>
+    RightClavicle          <Struct 'BoneReference' (0x00000207E460FE4C) {}> .. <Struct 'BoneReference' (0x00000207E460FE60) {}>
+    LeftArmUpper           <Struct 'BoneReference' (0x00000207E460FE8C) {}> .. <Struct 'BoneReference' (0x00000207E460FEA0) {}>
+    LeftArmLower           <Struct 'BoneReference' (0x00000207E460FB8C) {}> .. <Struct 'BoneReference' (0x00000207E460FBA0) {}>
+    RightArmUpper          <Struct 'BoneReference' (0x00000207E460FC8C) {}> .. <Struct 'BoneReference' (0x00000207E460FCA0) {}>
+    RightArmLower          <Struct 'BoneReference' (0x00000207E460FACC) {}> .. <Struct 'BoneReference' (0x00000207E460FAE0) {}>
+    LeftThigh              <Struct 'BoneReference' (0x00000207E460FD4C) {}> .. <Struct 'BoneReference' (0x00000207E460FD60) {}>
+    LeftShin               <Struct 'BoneReference' (0x00000207E460F7CC) {}> .. <Struct 'BoneReference' (0x00000207E460F7E0) {}>
+    LeftFoot               <Struct 'BoneReference' (0x00000207E460FFCC) {}> .. <Struct 'BoneReference' (0x00000207E460FFE0) {}>
+    RightThigh             <Struct 'BoneReference' (0x00000207E460FCCC) {}> .. <Struct 'BoneReference' (0x00000207E460FCE0) {}>
+    RightShin              <Struct 'BoneReference' (0x00000207E460FC4C) {}> .. <Struct 'BoneReference' (0x00000207E460FC60) {}>
+    RightFoot              <Struct 'BoneReference' (0x00000207E460FF4C) {}> .. <Struct 'BoneReference' (0x00000207E460FF60) {}>
+=== /Game/Korinsna/IKR_Korinsna
+  chain count: 15
+    Root                   <Struct 'BoneReference' (0x00000207E460FB4C) {}> .. <Struct 'BoneReference' (0x00000207E460FB60) {}>
+    Spine                  <Struct 'BoneReference' (0x00000207E460F78C) {}> .. <Struct 'BoneReference' (0x00000207E460F7A0) {}>
+    Neck                   <Struct 'BoneReference' (0x00000207E460EB8C) {}> .. <Struct 'BoneReference' (0x00000207E460EBA0) {}>
+    LeftClavicle           <Struct 'BoneReference' (0x00000207E460E98C) {}> .. <Struct 'BoneReference' (0x00000207E460E9A0) {}>
+    RightClavicle          <Struct 'BoneReference' (0x00000207E460F68C) {}> .. <Struct 'BoneReference' (0x00000207E460F6A0) {}>
+    LeftArmUpper           <Struct 'BoneReference' (0x00000207E460EA8C) {}> .. <Struct 'BoneReference' (0x00000207E460EAA0) {}>
+    LeftArmLower           <Struct 'BoneReference' (0x00000207E460F8CC) {}> .. <Struct 'BoneReference' (0x00000207E460F8E0) {}>
+    RightArmUpper          <Struct 'BoneReference' (0x00000207E460F74C) {}> .. <Struct 'BoneReference' (0x00000207E460F760) {}>
+    RightArmLower          <Struct 'BoneReference' (0x00000207E460F3CC) {}> .. <Struct 'BoneReference' (0x00000207E460F3E0) {}>
+    LeftThigh              <Struct 'BoneReference' (0x00000207E460F90C) {}> .. <Struct 'BoneReference' (0x00000207E460F920) {}>
+    LeftShin               <Struct 'BoneReference' (0x00000207E460F58C) {}> .. <Struct 'BoneReference' (0x00000207E460F5A0) {}>
+    LeftFoot               <Struct 'BoneReference' (0x00000207E460F6CC) {}> .. <Struct 'BoneReference' (0x00000207E460F6E0) {}>
+    RightThigh             <Struct 'BoneReference' (0x00000207E460F98C) {}> .. <Struct 'BoneReference' (0x00000207E460F9A0) {}>
+    RightShin              <Struct 'BoneReference' (0x00000207E460F80C) {}> .. <Struct 'BoneReference' (0x00000207E460F820) {}>
+    RightFoot              <Struct 'BoneReference' (0x00000207E460EC8C) {}> .. <Struct 'BoneReference' (0x00000207E460ECA0) {}>
+=== /Game/Korinsna/RTG_HunToKorinsna
+  missing

@@ -12,6 +12,7 @@ Run order (see tools/build_all.ps1):
     import_blank_parts.py       -> degenerate meshes over the hero's own parts
 """
 import os
+import re
 
 import unreal
 
@@ -31,96 +32,103 @@ IKR_TARGET = DEST + "/IKR_Korinsna"
 RETARGETER = DEST + "/RTG_HunToKorinsna"
 ANIM_BP = DEST + "/ABP_Korinsna_Retarget"
 
-# Fingers are deliberately NOT retargeted.
+# Which bone chains take part in the retarget, and with which modes, is DATA: ue/retarget_config.json.
 #
-# Every attempt to drive them produced visibly wrong fingers: they are small bones, so a constant
-# reference-pose error of a few degrees is already enough to read as long and curled, and Korinsna's
-# finger proportions differ from the hero's. Excluding them leaves them exactly at their bind pose,
-# which is why the model is shipped with a clenched fist baked in
-# (KorinsnaModel/npc_036_APOSE_clenched.blend -> the bind pose). Same principle the reference 2B mod
-# uses for its facial bones: a bone that is never retargeted cannot be deformed.
-#
-# To bring finger animation back, the honest route is per-bone retarget-pose offsets plus a hand IK
-# pass in the ABP - not simply re-adding the chain.
-RETARGET_FINGERS = False
-FINGER_CHAIN_PREFIXES = ("LeftHandThumb", "LeftHandIndex", "LeftHandMiddle", "LeftHandRing",
-                         "LeftHandPinky", "RightHandThumb", "RightHandIndex", "RightHandMiddle",
-                         "RightHandRing", "RightHandPinky")
+# This used to be a set of name-prefix tests here (`name.startswith(FINGER_CHAIN_PREFIXES)` etc.), which
+# is the kind of string matching that silently mis-handles a chain that is added or renamed later.
+# Every chain now carries its own `retarget` flag plus its rotation/translation modes, and the reasons
+# are recorded next to it in the file's `note` fields.
+CONFIG_PATH = os.path.join(ROOT, "ue", "retarget_config.json")
 
-# The dress chains are left out of the retarget.
-#
-# They were matched to the hero's robe chains geometrically, not by name, and the mapping does not hold
-# up in motion: the skirt ends up swinging into the legs instead of hanging. Excluding them keeps the
-# skirt at its modelled shape (the bind pose), which is rigid but never clips.
-RETARGET_SKIRT = False
-SKIRT_CHAIN_PREFIXES = ("LeftSkirt", "RightSkirt", "BackSkirt", "FrontSkirt")
 
-# The head is excluded as well. Korinsna's face is skinned across `head_Bone001`/`head_Bone002`, whose
-# pivots are not where the hero's single `Head` bone pivot is, so copying that rotation drags the face
-# out of shape. Leaving the head out keeps it at its modelled shape - it still turns with the neck
-# chain, exactly the trade-off the reference 2B mod makes for its facial bones.
-RETARGET_HEAD = False
-DROPPED_CHAINS = ("Head",)
+def load_config():
+    import json
 
-# (chain name, source start, source end, target start, target end)
-#
-# Chain names are shared between the two rigs so the retargeter's chain map can be built by name.
-# The game rig has five spine bones and 3ds-Max style fingers/cloth; Korinsna has two spine bones,
-# Bip001 fingers (Finger0 = thumb ... Finger4 = pinky) and its own skirt chains.
-CHAINS = [
-    ("Root", "Root", "Root", "Root", "Root"),
-    ("Spine", "pelvis", "spine_05", "Bip001-Pelvis", "Bip001-Spine1"),
-    ("Neck", "neck_01", "neck_02", "Bip001-Neck", "Bip001-Neck"),
-    ("Head", "Head", "Head", "head_Bone001", "head_Bone001"),
+    with open(CONFIG_PATH, encoding="utf-8") as handle:
+        return json.load(handle)
 
-    ("LeftClavicle", "clavicle_l", "clavicle_l", "Bip001-L-Clavicle", "Bip001-L-Clavicle"),
-    ("RightClavicle", "clavicle_r", "clavicle_r", "Bip001-R-Clavicle", "Bip001-R-Clavicle"),
 
-    # One chain per limb segment group, spanning the twist bones in between.
-    #
-    # Splitting these into one-bone chains to keep the max-style twist bones
-    # (Bip001-UpperArm -> Bone-UpperArm-Twist -> Bone-UpperArm-Twist1 -> Bip001-Forearm -> ...) out of
-    # the retarget made the deformation clearly worse: with the twist bones frozen the skin they carry
-    # (hundreds of weight units each) stops following the joint twist, and the limbs read as stretched.
-    # The FK op's Interpolated rotation mode is designed for exactly this case and spreads the joint
-    # rotation across the twist bones, so the continuous chain is kept.
-    ("LeftArm", "upperarm_l", "hand_l", "Bip001-L-UpperArm", "Bip001-L-Hand"),
-    ("RightArm", "upperarm_r", "hand_r", "Bip001-R-UpperArm", "Bip001-R-Hand"),
-    ("LeftLeg", "thigh_l", "ball_l", "Bip001-L-Thigh", "Bip001-L-Toe0"),
-    ("RightLeg", "thigh_r", "ball_r", "Bip001-R-Thigh", "Bip001-R-Toe0"),
+def enum_value(enum_type, name):
+    """`GloballyScaled` / `OneToOne` -> the unreal enum member, with a clear error if it is unknown."""
+    snake = re.sub(r"(?<!^)(?=[A-Z])", "_", str(name)).upper()
+    value = getattr(enum_type, snake, None)
+    if value is None:
+        raise SystemExit("unknown %s value: %s (expected e.g. %s)" % (
+            enum_type, name, ", ".join(n for n in dir(enum_type) if n.isupper())))
+    return value
 
-    ("LeftHandThumb", "thumb_01_l", "thumb_03_l", "Bip001-L-Finger0", "Bip001-L-Finger02"),
-    ("LeftHandIndex", "index_01_l", "index_03_l", "Bip001-L-Finger1", "Bip001-L-Finger12"),
-    ("LeftHandMiddle", "middle_01_l", "middle_03_l", "Bip001-L-Finger2", "Bip001-L-Finger22"),
-    ("LeftHandRing", "ring_01_l", "ring_03_l", "Bip001-L-Finger3", "Bip001-L-Finger32"),
-    ("LeftHandPinky", "pinky_01_l", "pinky_03_l", "Bip001-L-Finger4", "Bip001-L-Finger42"),
-    ("RightHandThumb", "thumb_01_r", "thumb_03_r", "Bip001-R-Finger0", "Bip001-R-Finger02"),
-    ("RightHandIndex", "index_01_r", "index_03_r", "Bip001-R-Finger1", "Bip001-R-Finger12"),
-    ("RightHandMiddle", "middle_01_r", "middle_03_r", "Bip001-R-Finger2", "Bip001-R-Finger22"),
-    ("RightHandRing", "ring_01_r", "ring_03_r", "Bip001-R-Finger3", "Bip001-R-Finger32"),
-    ("RightHandPinky", "pinky_01_r", "pinky_03_r", "Bip001-R-Finger4", "Bip001-R-Finger42"),
 
-    # skirt: the game's robe chains and Korinsna's dress chains were matched geometrically
-    # (tools/skirt_chain_map.py), not by name
-    ("LeftSkirtA", "bns_skirt_0_01_l", "bns_skirt_0_05_l", "l_skirt_1", "l_skirt_5"),
-    ("RightSkirtA", "bns_skirt_0_01_r", "bns_skirt_0_05_r", "r_skirt_1", "r_skirt_5"),
-    ("LeftSkirtB", "bns_skirt_1_01_l", "bns_skirt_1_05_l", "l_skirt_7", "l_skirt_11"),
-    ("RightSkirtB", "bns_skirt_1_01_r", "bns_skirt_1_05_r", "r_skirt_7", "r_skirt_11"),
-    ("LeftSkirtC", "bns_skirt_2_01_l", "bns_skirt_2_05_l", "l_skirt_13", "l_skirt_17"),
-    ("RightSkirtC", "bns_skirt_2_01_r", "bns_skirt_2_05_r", "r_skirt_13", "r_skirt_17"),
-    ("BackSkirt", "bns_skirt_3_01", "bns_skirt_3_05", "b_skirt_1", "b_skirt_5"),
-    ("FrontSkirt", "bns_frontSkirtArmorRibbon_01", "bns_frontSkirtArmorRibbon_05",
-     "m_skirt_1", "m_skirt_5"),
-]
+def merged_settings(chain, defaults):
+    """Config entry + defaults -> values written into the FK Chains op."""
+    merged = dict(defaults)
+    merged.update({key: value for key, value in chain.items()
+                   if key not in ("name", "retarget", "source", "target", "note")})
+    return merged
+
 
 lines = []
+if os.path.exists(RESULT):
+    os.remove(RESULT)
 
 
 def log(msg):
-    lines.append(str(msg))
+    """Write through, line by line: a failed build can die inside the engine (an assert in the IK
+    retargeter kills the process), and the log is the only evidence of how far it got."""
+    text = str(msg)
+    lines.append(text)
+    with open(RESULT, "a", encoding="utf-8") as handle:
+        handle.write(text + "\n")
 
 
 STALE_DIR = "/Game/KorinsnaStale"
+
+
+def bone_parents(mesh_path):
+    """{bone: parent} of a mesh, read from a throwaway component. The IK Rig controller does not expose
+    chain bone lists to Python and a chain is "every bone on the hierarchy path start -> end", so the
+    only way to know which bones a chain covers is to walk the skeleton."""
+    mesh = EAL.load_asset(mesh_path)
+    if mesh is None:
+        raise SystemExit("missing " + mesh_path)
+    subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    actor = subsystem.spawn_actor_from_class(unreal.SkeletalMeshActor, unreal.Vector(0, 0, 0))
+    component = actor.skeletal_mesh_component
+    component.set_skeletal_mesh_asset(mesh)
+    parents = {}
+    try:
+        for index in range(component.get_num_bones()):
+            name = str(component.get_bone_name(index))
+            parents[name] = str(component.get_parent_bone(unreal.Name(name)))
+    finally:
+        subsystem.destroy_actor(actor)
+    return parents
+
+
+def chain_bones(parents, start, end):
+    """Bones on the path from `start` down to `end`, inclusive; empty if `end` is not below `start`."""
+    if start not in parents or end not in parents:
+        return []
+    path = [end]
+    current = end
+    for _ in range(256):
+        if current == start:
+            return list(reversed(path))
+        parent = parents.get(current)
+        if parent in (None, "None", ""):
+            return []
+        path.append(parent)
+        current = parent
+    return []
+
+
+def _op_chain_names(rtg, index):
+    """Chain names an op holds settings for. A chain with no settings in any op cannot be mapped."""
+    try:
+        controller = rtg.get_op_controller(index)
+        entries = controller.get_settings().get_editor_property("chains_to_retarget")
+    except Exception as error:                      # ops without chain settings (pelvis/root motion)
+        return "n/a"
+    return "[%s]" % ",".join(str(e.get_editor_property("target_chain_name")) for e in entries)
 
 
 def cleanup_stale():
@@ -218,15 +226,19 @@ def main():
     ctrl_target.set_skeletal_mesh(target_mesh)
     ctrl_source.set_skeletal_mesh(source_mesh)
 
+    config = load_config()
+    defaults = config.get("defaults", {})
+    chains = config["chains"]
+    participating = [c for c in chains if c.get("retarget")]
+
     added_source = 0
     added_target = 0
-    for name, s_start, s_end, t_start, t_end in CHAINS:
-        if not RETARGET_FINGERS and name.startswith(FINGER_CHAIN_PREFIXES):
+    for chain in chains:
+        if not chain.get("retarget"):
             continue
-        if not RETARGET_SKIRT and name.startswith(SKIRT_CHAIN_PREFIXES):
-            continue
-        if not RETARGET_HEAD and name in DROPPED_CHAINS:
-            continue
+        name = chain["name"]
+        s_start, s_end = chain["source"]
+        t_start, t_end = chain["target"]
         if ctrl_source.add_retarget_chain(name, s_start, s_end, unreal.Name("None")):
             added_source += 1
         else:
@@ -235,7 +247,8 @@ def main():
             added_target += 1
         else:
             log("target chain failed: %s (%s..%s)" % (name, t_start, t_end))
-    log("chains: source=%d target=%d of %d" % (added_source, added_target, len(CHAINS)))
+    log("chains: source=%d target=%d of %d (%d not retargeted)" % (
+        added_source, added_target, len(chains), len(chains) - len(participating)))
 
     EAL.save_loaded_asset(rig_source, False)
     EAL.save_loaded_asset(rig_target, False)
@@ -256,42 +269,119 @@ def main():
     rtg.assign_ik_rig_to_all_ops(source_kind, rig_source)
     rtg.assign_ik_rig_to_all_ops(target_kind, rig_target)
     log("ops after assign_ik_rig_to_all_ops: %d" % rtg.get_num_retarget_ops())
-    rtg.auto_map_chains(unreal.AutoMapChainType.FUZZY, True)
-    log("ops after auto_map_chains: %d" % rtg.get_num_retarget_ops())
+    # Chain mapping is explicit, from the config: both IK rigs use the same chain names, so every
+    # target chain maps to the source chain of the same name. Fuzzy auto-mapping was removed: with the
+    # limbs split per joint it mapped some chains by name similarity, which left a target chain
+    # unmapped while its bones were still marked retargetable - that trips an editor assert
+    # ("Bone should never be retargeted and not in a mapped chain") inside auto_align_all_bones.
+    mapped_chains = 0
+    for chain in participating:
+        name = unreal.Name(chain["name"])
+        if rtg.set_source_chain(name, name):
+            mapped_chains += 1
+        else:
+            log("could not map chain %s" % chain["name"])
+    log("chains mapped explicitly: %d of %d" % (mapped_chains, len(participating)))
+    log("ops after chain mapping: %d" % rtg.get_num_retarget_ops())
+
+    # The retargeter looks the mapping up by bone -> chain -> mapped chain, so a target chain that ends
+    # up without a source chain makes it assert ("Bone should never be retargeted and not in a mapped
+    # chain") inside auto_align_all_bones and takes the whole editor down. Verify before aligning and
+    # skip the align instead of crashing: an unaligned pose is a visible defect, a crash is a lost build.
+    unmapped = [c["name"] for c in participating
+                if not str(rtg.get_source_chain(unreal.Name(c["name"])))]
+    for index in range(rtg.get_num_retarget_ops()):
+        log("  op[%02d] %-22s chains=%s" % (
+            index, str(rtg.get_op_name(index)), _op_chain_names(rtg, index)))
+    if unmapped:
+        log("ALIGN SKIPPED - chains without a source mapping: %s" % unmapped)
 
     # Aligns the target retarget pose to the source's. Without it the per-bone rotation offsets are
     # computed against two different reference poses, which is what made the fingers come out long and
     # curled and produced the occasional stretched limb during animations.
-    if hasattr(rtg, "auto_align_all_bones"):
-        aligned = rtg.auto_align_all_bones(target_kind)
-        log("auto_align_all_bones(target) = %s" % aligned)
-        EAL.save_loaded_asset(rig_target, False)
+    #
+    # `auto_align_all_bones` is NOT used: it walks every bone it considers retargetable, and the engine
+    # asserts ("Bone should never be retargeted and not in a mapped chain") as soon as one of them is in
+    # no mapped chain - which kills the editor process mid-build. Aligning the bones of our own mapped
+    # chains through `auto_align_bones` is the same alignment, one chain at a time, and it keeps the log
+    # showing how far it got.
+    if not hasattr(rtg, "auto_align_bones"):
+        log("auto_align_bones is not exposed in this build")
+    elif unmapped:
+        log("alignment skipped: unmapped chains")
     else:
-        log("auto_align_all_bones is not exposed in this build")
+        parents = bone_parents(TARGET_MESH)
+        method = unreal.RetargetAutoAlignMethod.CHAIN_TO_CHAIN
+        aligned = 0
+        for chain in participating:
+            bones = [unreal.Name(b) for b in chain_bones(
+                parents, chain["target"][0], chain["target"][1])]
+            if not bones:
+                log("  align %-14s no bones on the path %s..%s" % (
+                    chain["name"], chain["target"][0], chain["target"][1]))
+                continue
+            rtg.auto_align_bones(bones, method, target_kind)
+            aligned += 1
+            log("  align %-14s %d bone(s): %s" % (chain["name"], len(bones), ", ".join(
+                str(b) for b in bones)))
+        log("aligned %d chain(s), retarget pose saved" % aligned)
+        EAL.save_loaded_asset(rig_target, False)
 
-    # The IK half of the default stack is dead weight here: it retargets IK goals, and the target IK
-    # Rig has no goals or solvers, so those ops have nothing to solve. What is left is the pure FK
-    # rotation copy plus pelvis/root motion, which is exactly a "same pose" retarget.
-    disabled = []
+    # Op enable flags come from the config too. The IK half of the default stack must stay off: it
+    # retargets IK goals, and the target IK Rig has no goals or solvers, so enabling it crashes the
+    # game (TECHNICAL-GUIDE §6.12). What is left is the pure FK rotation copy plus pelvis/root motion.
+    wanted_ops = config.get("ops", {})
     for index in range(rtg.get_num_retarget_ops()):
         name = str(rtg.get_op_name(index))
-        if name in ("Retarget IK Goals", "Run IK Rig", "Remap Curves"):
-            if rtg.set_retarget_op_enabled(index, False):
-                disabled.append(name)
-            else:
-                log("could not disable op %s" % name)
-    log("disabled ops: %s" % (disabled or "none"))
+        if name in wanted_ops:
+            enabled = bool(wanted_ops[name])
+            if not rtg.set_retarget_op_enabled(index, enabled):
+                log("could not set op %s enabled=%s" % (name, enabled))
     for index in range(rtg.get_num_retarget_ops()):
         log("  op[%02d] %-22s enabled=%s" % (
             index, str(rtg.get_op_name(index)), rtg.get_retarget_op_enabled(index)))
 
-    missing = []
-    for name, _ss, _se, t_start, _te in CHAINS:
-        mapped = rtg.get_source_chain(unreal.Name(name))
-        if not str(mapped):
-            missing.append(name)
-    log("chains without a source mapping: %s" % (missing or "none"))
+    # Per-chain modes, straight from the config: rotation mode/alpha, translation mode/alpha, enable.
+    # `set_settings` takes the whole struct, so it is read, edited per chain and written back once.
+    fk_index = rtg.get_index_of_op_by_name(unreal.Name("FK Chains"))
+    if fk_index < 0:
+        log("FK Chains op not found - chain settings not applied")
+    else:
+        controller = rtg.get_op_controller(fk_index)
+        settings = controller.get_settings()
+        by_name = {c["name"]: merged_settings(c, defaults) for c in participating}
+        op_chains = settings.get_editor_property("chains_to_retarget")
+        for chain in op_chains:
+            name = str(chain.get_editor_property("target_chain_name"))
+            values = by_name.get(name)
+            if values is None:
+                log("  chain in op but not in config: %s (left at defaults)" % name)
+                continue
+            chain.set_editor_property("enable_fk", bool(values.get("enable_fk", True)))
+            chain.set_editor_property("rotation_mode", enum_value(
+                unreal.FKChainRotationMode, values.get("rotation_mode", "Interpolated")))
+            chain.set_editor_property("rotation_alpha", float(values.get("rotation_alpha", 1.0)))
+            chain.set_editor_property("translation_mode", enum_value(
+                unreal.FKChainTranslationMode, values.get("translation_mode", "None")))
+            chain.set_editor_property("translation_alpha",
+                                      float(values.get("translation_alpha", 1.0)))
+            log("  %-16s enableFK=%-5s rot=%-13s rotA=%.2f trans=%-15s transA=%.2f" % (
+                name, chain.get_editor_property("enable_fk"),
+                str(chain.get_editor_property("rotation_mode")).rsplit(".", 1)[-1],
+                chain.get_editor_property("rotation_alpha"),
+                str(chain.get_editor_property("translation_mode")).rsplit(".", 1)[-1],
+                chain.get_editor_property("translation_alpha")))
+        settings.set_editor_property("chains_to_retarget", op_chains)
+        controller.set_settings(settings)
+        log("FK chain settings applied to %d chain(s)" % len(op_chains))
     EAL.save_loaded_asset(retargeter, False)
+
+    missing = []
+    for chain in participating:
+        mapped = rtg.get_source_chain(unreal.Name(chain["name"]))
+        if not str(mapped):
+            missing.append(chain["name"])
+    log("chains without a source mapping: %s" % (missing or "none"))
 
     # ---------------------------------------------------------------- anim blueprint
     skeleton = EAL.load_asset(TARGET_SKEL)

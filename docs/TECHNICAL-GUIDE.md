@@ -92,11 +92,16 @@ Lua 侧随后只要 `StaticFindObject("/Game/Korinsna/ABP_Korinsna_Retarget.ABP_
 
 # 只重新打包（资产与 cook 结果已存在）
 & tools\build_all.ps1 -SkipAssets -SkipCook
+
+# 换了绑定姿态 / 换了 .blend 之后：先重导 FBX，再跑 build_all（不带 -SkipAssets）
+& I:\Blender\blender.exe -b --python blender\scripts\export_korinsna_apose.py -- `
+    KorinsnaModel\npc_036_APOSE.blend blender\out\Korinsna_APose.fbx 1.0
+# 看导出打印的 bounds：A-pose 是 x ±44.8/44.0、z 0.04..173.72（握拳版是 x ±42.8/42.4）
 ```
 
 | 脚本 | 作用 |
 | --- | --- |
-| [blender/scripts/export_korinsna_apose.py](../blender/scripts/export_korinsna_apose.py) | 导出 APOSE/握拳 FBX；**两步烘焙绑定姿态**（见 §5.2） |
+| [blender/scripts/export_korinsna_apose.py](../blender/scripts/export_korinsna_apose.py) | 从 `npc_036_APOSE.blend` 导出 FBX；**两步烘焙绑定姿态**（见 §5.2） |
 | [ue/scripts/import_korinsna_sk.py](../ue/scripts/import_korinsna_sk.py) | 导入 `SK_Korinsna` + 独立骨架 |
 | [ue/scripts/build_mod_assets.py](../ue/scripts/build_mod_assets.py) | 覆盖游戏贴图（必须 VT）+ 8 个材质槽占位 |
 | [ue/scripts/import_hun_preview.py](../ue/scripts/import_hun_preview.py) | 游戏骨架预览网格（仅编辑器） |
@@ -110,6 +115,14 @@ Lua 侧随后只要 `StaticFindObject("/Game/Korinsna/ABP_Korinsna_Retarget.ABP_
 | [tools/make_neutral_textures.py](../tools/make_neutral_textures.py) | 生成中性辅助贴图（注意 §6.8 的通道顺序坑） |
 | [tools/luacheck.py](../tools/luacheck.py) | Lua 静态语法检查（lupa） |
 | [tools/check_forward_refs.py](../tools/check_forward_refs.py) | 检测「先调用后声明」的 `local function`（见 §6.20） |
+| [tools/install_lua.ps1](../tools/install_lua.ps1) | 安装 Lua 半边的 **release / dev** 版本（只差日志与普查开关，见 §7.1） |
+| [tools/make_release.ps1](../tools/make_release.ps1) | 把两个半边整理成可直接分发的 `Release\KorinsnaModel\` + `Release\KorinsnaRetarget\`（先跑三项检查，不打包压缩） |
+| [tools/smoke_lua.py](../tools/smoke_lua.py) | 不启动游戏就跑一遍脚本：release / dev × 三种世界（空 / 有英雄 / 英雄晚到），断言无报错、release 不写日志 |
+| [ue4ss/dev/config.dev.lua](../ue4ss/dev/config.dev.lua) | **仅 dev**：叠加在 `config.lua` 上的开关（`log_level=2` + 各普查打开） |
+| [ue/scripts/dump_retarget_settings.py](../ue/scripts/dump_retarget_settings.py) | 只读：导出 retargeter 的 op 开关与每条链的旋转/位移模式（`extract/ue-retarget-settings.txt`） |
+| [ue/scripts/dump_chain_bones.py](../ue/scripts/dump_chain_bones.py) | 只读：导出每条链实际包含的骨（`extract/ue-chain-bones.txt`），用来发现链里的扭转骨 |
+| [ue/scripts/probe_chains.py](../ue/scripts/probe_chains.py) | 只读：两个 IK Rig 的链、retargeter 的映射、各 op 的链设置（查「链没映射」类崩溃） |
+| [ue/scripts/probe_fingers.py](../ue/scripts/probe_fingers.py) | 只读：两套骨架的手指/手掌骨的父子关系（切手指链前必看） |
 
 ### 3.1 为什么必须「原生 5.7 cook + UAT staging」
 
@@ -122,17 +135,30 @@ Lua 侧随后只要 `StaticFindObject("/Game/Korinsna/ABP_Korinsna_Retarget.ABP_
 
 ## 4. 重定向链的配置
 
-- 手写映射，`CHAINS` 表里共 28 条，**当前只启用 9 条**（`build_retarget_assets.py`）：
-  Root、Spine、Neck、双锁骨、双臂、双腿。手指 / Head / 8 条裙摆链全部关闭（原因见 §5.4~§5.6）。
-- **建完链必须调用 `auto_align_all_bones(TARGET)`**。没有它，每根骨的旋转偏移是拿两套不同的参考姿态
-  算出来的 → 手指卷曲、四肢偶发拉伸。
+**唯一的配置来源是 [ue/retarget_config.json](../ue/retarget_config.json)**：每条链的名字、源/目标起止骨、
+是否参与重定向、FK 旋转/位移模式与权重、以及一条 `note` 说明为什么是这样。`build_retarget_assets.py`
+只读这个文件，**不再按名字前缀猜**（以前用 `name.startswith("LeftSkirt")` 之类的字符串判断，
+加一条链或改个名字就会静默出错）。
+
+- 文件里登记了 58 条链，**当前启用 49 条**：Root、Spine、Neck、双锁骨、双臂 3 段 ×2、双腿 4 段 ×2、
+  双手腕、手指 3 段 ×5 指 ×2 手。Head / 8 条裙摆链保持 `retarget: false`（原因见 §5.5、§5.7），
+  它们仍写在文件里，作用是把「测出来的骨骼范围 + 为什么不用」记录下来。
+- **链映射是显式的**：两条 IK Rig 用同一条链名，`set_source_chain(name, name)` 逐条映射，
+  之后打印 `chains mapped explicitly: N of N`，再逐链核对 `get_source_chain` 是否为空。
+  不要再用 `auto_map_chains(FUZZY, True)`：链名一变它就会按名字相似度乱配。
+- **逐链对齐**：`auto_align_bones(该链的骨, CHAIN_TO_CHAIN, TARGET)` 一条链一次，日志会打印
+  `align <链> N bone(s): ...`。不要用 `auto_align_all_bones`（原因见 §6.23）。
 - 建 IK Rig 前必须 `KorinsnaEditorLibrary.sync_reference_pose(TARGET_MESH)`
   （内部是 `USkeleton::UpdateReferencePoseFromMesh`），并在之后**重新 set_skeletal_mesh**，
   因为 IK Rig 会缓存骨骼参考姿态。
 - 只启用 `Pelvis Motion` / `FK Chains` / `Root Motion`；`Retarget IK Goals`、`Run IK Rig`、
-  `Remap Curves` 必须关闭——没有 goal/solver 时打开它们会崩游戏。
-- 手臂/腿用**整条连续链**（`UpperArm→Hand`、`Thigh→Toe`），由 FK op 的 `Interpolated`
-  旋转模式把关节旋转分摊给中间的扭转骨（见 §5.6）。
+  `Remap Curves` 必须关闭——没有 goal/solver 时打开它们会崩游戏（§6.12）。
+- 三条硬规则（都踩过）：
+  1. **链不能重叠**：同一根骨属于两条链时，`GetChainNameForBone()` 返回合成名（`A,B`），
+     映射查不到 → 编辑器断言崩溃（§6.23）。
+  2. **骨盆不能出现在任何链里**：`TranslationMode=None` 会把链首骨钉回参考姿态，骨盆因此不动（§6.24）。
+  3. **扭转骨不能跳过**：UE 的链是「起点到终点的整条层级路径」，绕不开，只能切段（§5.6）。
+
 
 ---
 
@@ -156,8 +182,11 @@ tex.set_editor_property("virtual_texture_streaming", True)   # 关键
 
 ### 5.2 绑定姿态必须同时烘进「顶点」和「骨骼」（两步）
 
-`export_korinsna_apose.py` 从 `npc_036_APOSE_clenched.blend` 导出时必须做两步，只做一步就会出现
+`export_korinsna_apose.py` 从 `npc_036_APOSE.blend` 导出时必须做两步，只做一步就会出现
 「手是张开的」「四肢偶发拉伸」：
+
+> 早期为了「手指不参与重定向」曾改用 `npc_036_APOSE_clenched.blend`（握拳绑定姿态）；
+> 手指改成逐关节重定向（§5.4）后已换回 `npc_036_APOSE.blend`。两步烘焙的做法不变。
 
 1. **把姿势烘进网格顶点**：rest 姿势还是原始 A-pose 时 `modifier_apply` 骨架修改器
    （网格带形态键，需先 `shape_key_clear()`；morph target 反正不入包）。
@@ -196,32 +225,66 @@ tex.set_editor_property("virtual_texture_streaming", True)   # 关键
 
 编辑器里创建的占位 MI **不进包**（staging 时剔除）；一旦进包，游戏里人物会变成灰模/纯色。
 
-### 5.4 手指不参与重定向
+### 5.4 手指：换了绑定姿态 + 逐关节切段后才成立
 
 手指骨极小，几度参考姿态误差就足以看起来「过长/卷曲」，而 Korinsna 的手指比例与魂不同。
-试过 3↔3 一一对应 + `Interpolated` + `auto_align_all_bones` + `sync_reference_pose()`
-（参考 2B mod 的完整配方），游戏里仍然变形。
+早期试过 3↔3 一一对应 + `Interpolated` + `auto_align_all_bones` + `sync_reference_pose()`
+（参考 2B mod 的完整配方），游戏里仍然变形，所以当时**关掉手指、绑定姿态用握拳版**
+（`npc_036_APOSE_clenched.blend`）。
 
-最终方案：**不重定向手指**，绑定姿态取自 `npc_036_APOSE_clenched.blend`（握拳），
-于是游戏中手指保持握拳。
+四肢的「切段」方案（§5.6）验证成功之后手指也按同一套做，并且**绑定姿态换回 `npc_036_APOSE.blend`**
+（手指略微张开，导出后 `bounds x` 从 ±42.8 变成 ±44.4）：
 
-> 这是「不参与重定向的骨骼不可能被重定向搞坏」原则的应用，参考 2B mod 对 22 根面部骨也是这么做的。
-> 想要手指动画，正确路线是「逐骨 retarget-pose 偏移 + ABP 里的手部 IK」，而不是把链简单加回来。
+- 每根手指按关节切 3 段、每段一条单骨源链：
+  `LeftIndex1` = `index_01_l → Bip001-L-Finger1`、`LeftIndex2` = `index_02_l → Bip001-L-Finger11`、
+  `LeftIndex3` = `index_03_l → Bip001-L-Finger12`（拇指/中指/无名指/小指同理，左右共 30 条）。
+  Korinsna 每根手指的骨名规律是 `<Finger><k>`、`<Finger><k>1`、`<Finger><k>2`
+  （`Finger1 / Finger11 / Finger12`；拇指是 `Finger0 / Finger01 / Finger02`）。
+- 源骨架的手掌多一层 `*_metacarpal_*`（`index_metacarpal_l` 等），目标没有对应骨，
+  **不进任何链**，保持参考姿态。
+- 手腕骨本身仍是独立的一条 `LeftHand` / `RightHand` 单骨链。
+
+结果：手指跟随动画（握拳、张开、拿武器时贴合握把），指节无变形。若以后又想关掉，
+把 `ue/retarget_config.json` 里那 30 条的 `retarget` 改回 `false` 重新 cook 即可
+（绑定姿态是 A-pose，不会退回握拳）。
 
 ### 5.5 Head 链不参与重定向
 
 Korinsna 的脸蒙在 `head_Bone001` / `head_Bone002` 上，枢轴与魂的单根 `Head` 不同，
 跟着转会把脸拽变形。去掉 Head 链后头只靠 Neck 链跟随——这是有意接受的取舍。
 
-### 5.6 扭转骨必须留在链里
+### 5.6 扭转骨：不能跳过，只能切段
 
-`Bone-*-Twist` / `-Twist1` 共 16 根，每根都有数百的蒙皮权重。曾把手/腿链拆成逐骨 1:1 链，
-让扭转骨完全不参与重定向，结果**形变明显变差**：扭转骨承载的皮肤不再跟随关节扭转，
-四肢看起来被拉长。
+`Bone-*-Twist` / `-Twist1` 共 16 根，每根都有数百的蒙皮权重。它们**就在层级路径上**
+（手臂：`UpperArm → Bone-UpperArm-Twist → Bone-UpperArm-Twist1 → Forearm → Bone-ForeArm-Twist →
+Bone-ForeArm-Twist1 → Hand`，7 根；腿 8 根），而 UE 的链就是「起点到终点的整条路径」，
+**没法把中间的骨排除掉**。
 
-现在用整条链 + FK op 的 `Interpolated` 旋转模式把关节旋转分摊到扭转骨。
-IK Retargeter 的旋转模式是**链级**设置，**没有逐骨轴向限制**；要做「只绕骨轴旋转」必须在 ABP 里加
-约束节点，暂未实现。
+于是 `Interpolated` 模式会按骨的序号比例去插值：目标 `Forearm` 在 3/6 处刚好等于源 `lowerarm`（肘是对的），
+但两根 `Twist` 在 1/6、2/6 处会把**肘的弯曲**分摊掉三分之一、三分之二 →
+整条手臂被慢慢掰弯成**拱形**（这也是 IK_check 第 3 项真正的原因）。
+
+历史教训：曾把手/腿链拆成逐骨 1:1 链，让扭转骨完全不参与重定向，结果形变明显变差
+（扭转骨承载的皮肤不再跟随关节）。**逐骨链是错的，切段是对的。**
+
+现在的做法（见 `ue/retarget_config.json`）：每条肢体切成**首尾相接、互不重叠**的段，
+每段结束在「关节前的最后一根扭转骨」上、起始在真正的关节骨上，每段的源链写成**单骨链**：
+
+| 段 | 源链（单骨） | 目标链 |
+|---|---|---|
+| LeftArmUpper | `upperarm_l..upperarm_l` | `Bip001-L-UpperArm..Bone-L-UpperArm-Twist1` |
+| LeftArmLower | `lowerarm_l..lowerarm_l` | `Bip001-L-Forearm..Bone-L-ForeArm-Twist1` |
+| LeftHand | `hand_l..hand_l` | `Bip001-L-Hand` |
+| LeftThigh / LeftCalf / LeftFoot / LeftToe | 同理 | `..Thigh-Twist1` / `..Calf-Twist1` / `Foot` / `Toe0` |
+
+单骨源链在 `GetTransformAtChainParam()` 里直接返回那一根骨（`Params.Num()==1` 的分支），
+于是该段内所有骨（含扭转骨）**刚性复制同一个关节的旋转**：扭转骨仍在重定向里、仍跟随关节，
+但不再分摊关节的弯曲 → 拱形消失，皮肤不被拧成糖果纸。
+
+> 必须「相邻不重叠」而不是「按关节各一条链」：两条链共用一根骨会让 `GetChainNameForBone()`
+> 返回合成名并断言崩溃，见 §6.23。
+
+**手指用同一套办法**（§5.4）：每根手指 3 节各自成段，源链是单骨链，于是每节指骨刚性复制魂对应那一节。
 
 ### 5.7 裙摆不参与重定向
 
@@ -335,6 +398,24 @@ IK 的隐含前提是「我们的手能够到魂的手」。实测两手间距�
 
 **只处理主角自己的组件**：这个函数一度遍历整个关卡的骨骼网格，把 NPC 和铃铛一起踢出 base pass
 （§6.15）。判据是 owner 是否为当前主角 Actor（`belongs_to_actor`）。
+
+### 5.12 骨盆只由 Pelvis Motion op 驱动，不能放进任何链
+
+UE 的默认模板里，骨盆**不属于任何链**：`GetChainNameForBone()` 对骨盆有特例，直接返回
+`"Retarget Pelvis"`。当时我们把 `Spine` 链写成 `pelvis..spine_05`，于是骨盆成了链的首骨，
+而 FK 链 op 的 `TranslationMode=None` 走这一支：
+
+```cpp
+case EFKChainTranslationMode::None:
+    OutPosition = ParentGlobalTransform.TransformPosition(InitialLocalOffset);  // 链首父级为空
+```
+
+即**每次求值都把骨盆摆回重定向姿态（参考姿态）的位置**，把 Pelvis Motion op 刚算出来的位移抹掉。
+现象：站立看不出来（参考姿态就是站着），蹲下/坐下/躺下时游戏本体骨盆下降 50-60cm，我们的骨盆一动不动
+→ 整个人**浮在空中**（实测见 §8.9：`ours pelvis` 整场都是 -1189.4，`src` 从 -1180 掉到 -1240）。
+
+修法：`Spine` 链从 `spine_01`（目标 `Bip001-Spine`）开始，骨盆交给 Pelvis Motion op。
+`ue/retarget_config.json` 里 `Spine` 的 `note` 记录了这一点。
 
 ---
 
@@ -479,40 +560,48 @@ IK 的隐含前提是「我们的手能够到魂的手」。实测两手间距�
 4. 过场 / 预览会额外生成「主角副本」，用 `PlayerController:K2_GetPawn()` 认出真正的玩家 Pawn，
    副本一律忽略（否则会把状态切到副本上）。
 
-### 6.17 交互动画之后模型变默认姿势（重启才恢复）
+### 6.17 交互动画之后模型变默认姿势（现在 0.5 秒内恢复）
 
 **根因：游戏重新给部件组件设了 leader pose。** 交互 / 过场会让游戏重建主角部件，
 `meshhead` 重新以 `CharacterMesh0` 为 leader pose 源；跟随者组件**不评估自己的动画**，
 post-process 重定向图也就不跑，网格回落到**参考姿势**（看着就是「默认姿势」）。
-脚本只在「首次见到该组件」时清过一次 leader pose（每轮清会让姿势卡在第一帧），之后再也不清。
+手动清一次就好，但「每轮都清」会让姿势卡在第一帧——所以必须**只在它真的被设上时清**。
 
-**修法：姿势看门狗（`watch_pose`，每轮扫描）**——经过四轮实机迭代才做对，下面记录每一步的**测量教训**：
+**修法：直接读那个指针。** `LeaderPoseComponent` 是 `USkinnedMeshComponent` 上的
+`UPROPERTY(BlueprintReadOnly)`，UE4SS 会把 `TWeakObjectPtr` 解析成对象，所以每轮只要一次属性读：
 
-| 尝试 | 结果 | 原因 |
+```lua
+local leader = component.LeaderPoseComponent   -- nil = 自己在跑动画
+if leader ~= nil then
+    component:SetLeaderPoseComponent(nil, true, true)   -- 只在被设上时清，不会卡帧
+end
+```
+
+这就是「必须撤销的那件事」本身，因此：
+
+- **0.5 秒内恢复**（旧实现靠骨位移统计，要 12 轮 ≈ 2 秒才敢确认）；
+- **没有阈值、没有滑动窗口、没有误判**——不需要区分「角色转身」和「姿势冻结」；
+- 每轮只有一次属性读，比旧实现每轮 4 次 `GetSocketLocation` + 向量数学更便宜。
+
+`watch_pose` 现在按顺序检查三件事：
+
+| 顺序 | 信号 | 处理 |
 | --- | --- | --- |
-| 每轮清一次 leader pose | 姿势卡在第一帧 | 重复 `SetLeaderPoseComponent` 会重新初始化姿势 |
-| 单帧阈值（原身体 >1cm 且我们 <0.05cm，连续 4 次） | 几乎不触发 | 待机动作每 0.5 秒只有几毫米 |
-| 世界坐标 + 累计窗口 | 完全不触发 | **角色转身被当成在动**：冻结期间向量 Z 恒为 5.6，X/Y 却绕圈摆动、幅度恒 ~45cm |
-| 组件空间 + 滑动窗口 + 丢弃坏读数 | ✅ 2 秒内恢复 | 见下 |
+| 1 | `LeaderPoseComponent` 非空 | 立刻清（无冷却：清的是「已经坏掉」的状态） |
+| 2 | `GetPostProcessInstance()` 为 nil（重定向图被拆掉） | toggle `DisablePostProcessBlueprint` 重建，带 `pose_heal_cooldown`(6 轮) 冷却；连续两次失败才升级到 `MarkRenderStateDirty` + `SetBoundsScale` |
+| 3 | `pose_bone_fallback`（开了才跑） | 旧的骨位移窗口，兜底「两个状态都正常但姿势确实不动」的情况。实机确认这条**才是实际生效的那个**：日志里丢姿势那次没有 leader pose、post-process 实例也在，只有骨位移能看出来 |
 
-最终实现：
+两个保护：
 
-1. **姿态向量用组件空间**（`bone_component`）算「骨盆→右手」；世界坐标会把角色朝向的变化算成姿势变化。
-   `GetBoneTransform` 在本作里偶发返回**零值**，长度不在 5~200cm 的读数**直接丢弃**（视为「无信息」，
-   这一轮不参与判定，既不算动也不算停）。
-2. **每轮分类**：原身体位移 > `pose_step_move_cm`(0.5) 且我们 < `pose_step_stuck_cm`(0.3) → 记一次「停滞」。
-3. **滑动窗口判决**：最近 `pose_slip_window`(12) 轮里「停滞」≥ `pose_stuck_marks`(4) 次 → 约 2 秒即判定。
-   用计数而不是「连续」，是因为一次坏读数就会把连续计数清零（实测因此丢了 17 秒）。
-4. **重建**：`SetLeaderPoseComponent(nil,true,true)` + `SetEnableAnimation(true)` +
-   `SetDisablePostProcessBlueprint(false)`；连续两次判定失败时**升级**——toggle
-   `DisablePostProcessBlueprint` 强制重建 post-process 实例 + `MarkRenderStateDirty()`。
-5. 附加的**最快信号**：每轮读 `GetPostProcessInstance()`，一旦为 nil（重定向图被拆掉）立刻重建，不等窗口。
-6. 冷却 `pose_heal_cooldown`(6 轮) 防止变成重置循环。
+- 第 2 项连续 5 次都拿不到实例后**放弃**（这个 build 不暴露该 getter 时不至于每 3 秒重建一次）；
+- 属性读失败（反射里没有这个属性）时**关掉第 1 项并只记一条日志**，不用每轮刷屏。
 
-重建之后还必须处理武器（§5.8.2），否则刀刃朝向会歪。
+重建 / 清 leader pose 之后要让武器重新锚定（§5.8.2）：现在用「等 `pose_weapon_wait`(2) 轮」
+代替「等骨骼重新动起来」，因为修复本身已经是一个已知事件，不需要再观测。
 
-> 调试开关：`report_pose_window`（每 5 轮打印 `pose window: N/12 stalled … | src … move … | ours … move …`）。
-> 这三轮实机定位全靠它——没有它只能靠猜。
+> 保留的历史教训（最初四轮迭代怎么把骨位移方案调出来的）见 git 历史与旧版文档；
+> 结论是：**能从状态里读出来的事，不要靠观测推断。**
+> 调试开关：`report_pose_window`（每 5 轮打印窗口计数，看第 3 项是否真的在兜底）。
 
 ### 6.18 衣服颜色发白 / 像褪色（真正的元凶：游戏换掉了槽 0 的材质）
 
@@ -673,12 +762,153 @@ end
 **教训**：UE4SS 的 Lua 包装**不会**让 UObject 保活，也不保证读写已释放内存时表现为安全失败——
 `valid()`（内部是 `IsValid()`）对悬垂指针同样不可靠。凡是跨扫描保存的东西，存名字。
 
+### 6.23 建链时的编辑器断言崩溃（`IKRetargeterPoseGenerator.cpp:118`）
+
+```
+Assertion failed: ChainToMatch != NAME_None
+Bone should never be retargeted and not in a mapped chain.
+```
+
+这是**建资产时**的崩溃（编辑器直接退出，cook 也就没了），不是游戏崩溃。触发条件有两条，都属于
+「链的拓扑不合法」：
+
+1. **两条链共用一根骨**。`FIKRetargetProcessor::GetChainNameForBone()` 对属于多条链的骨返回一个
+   **合成名**（把各链名拼起来），映射表里当然没有 → `GetFirstChainMappedToChain()` 返回 `None` → 断言。
+   这就是「按关节把手臂拆成 `UpperArm..Forearm` + `Forearm..Hand`」失败的原因：肘关节那根骨被两条链共用。
+   解法见 §5.6：切段时**首尾相接但不共用骨**（上一段结束在关节前的最后一根扭转骨上）。
+2. **链上的骨不属于任何已映射的链**，同时被当成「应当重定向」——用 `auto_map_chains(FUZZY, True)`
+   乱配之后很容易出现。
+
+排查手法（`build_retarget_assets.py` 里已经内置，别再改回去）：
+- `log()` **逐行写文件**：断言会杀掉进程，缓冲的日志会全丢（第一次排查就是因为这个只拿到上一次运行的旧结果）。
+- 建链后打印每条链的骨（`bone_parents` + `chain_path` 走一遍层级）。
+- 映射后逐条 `get_source_chain(name)` 核对，并在对齐前打印每个 op 的 `chains_to_retarget`。
+- **不用 `auto_align_all_bones`**：它会遍历「它认为可重定向」的全部骨，撞上未映射的就断言；
+  改成 `auto_align_bones(本链的骨, CHAIN_TO_CHAIN, TARGET)` 一条链一次，既能定位问题也不会被无辜的骨带崩。
+
+### 6.24 坐下 / 躺下 / 被击倒时整个人浮空
+
+根因和修法见 §5.12：骨盆被写进 `Spine` 链，FK 链 op 的 `TranslationMode=None` 每帧把它摆回参考姿态，
+Pelvis Motion 算出的位移被覆盖 → 骨盆高度恒定，只有四肢在动。
+
+诊断靠 `config.report_ground_every`（§8.9）：站立正常只是一个巧合（参考姿态本来就是站姿），
+真正要看的是**游戏本体骨盆和我们的骨盆的 Z 差**在蹲下时是否跟着变。
+
+---
+
+### 6.25 偶发卡顿：每轮三次全关卡搜索
+
+**现象**：正常跑图时每隔一两秒卡一下，过场和读图时更明显。
+
+**根因一：每轮扫描里的三次全关卡搜索。** `anchor_held_weapons`、`hide_scabbards`、`anchor_back_items`
+各自调用一次 `FindAllOf("SkeletalMeshComponent")`：这个调用会遍历**整个 UObject 数组**
+（本作实测 15 万+ 对象）并为每个命中创建 Lua 包装。每 0.5 秒三次 ≈ **每秒 90 万次对象访问**。
+
+**根因二：日志。** 每行日志都是一次「打开文件 + 写 + 关闭」加一次控制台打印，读图/过场时
+`new component:` 这类行成千上万。
+
+**修法**：
+
+| 位置 | 原来 | 现在 |
+| --- | --- | --- |
+| 武器 / 刀鞘 / 腰后刀 | 每轮**各**一次全关卡搜索（3 次） | 每轮**一次**搜索，结果按名字缓存，三个 job 都读缓存（`refresh_targets`） |
+| 阴影清理 | 每轮 19 次 `StaticFindObject` | 每 2 轮一次（`quiet_parts_every`） |
+| 日志 | 每行都写 | release 只写「出问题」的行（`log_level=1`），dev 才全写（`log_level=2`） |
+| 监听器 | 每次回调都可能写一行 | 回调只做两跳 `ExecuteInGameThread` 后转交 `inspect_new`，诊断行都在 level 2 |
+
+**关于 `NotifyOnNewObject`（监听器）：保留。** 它确实挂在引擎的对象构造路径上、读图/过场会触发上万次，
+但它也是**唯一可靠的「英雄出现了」信号**：一次把它换成轮询，结果轮询因为计数器 bug 一次都没能再跑
+（§6.26），整局 mod 完全没生效——原版衣服、无动画、武器挂在魂身上。取舍是：
+**监听器留着保正确性，卡顿从「每轮三次搜索」和「日志」里省**。
+
+### 6.25.1 「用组件树替代全关卡搜索」这条路走不通（已回退）
+
+想法很自然：我们要动的武器**本来就挂在英雄身上**（锚定条件就是 `GetAttachParent() == state.source`），
+而挂在英雄组件上的东西一定在英雄 Actor 的子树里，那么一次
+`GetChildrenComponents(includeAllDescendants=true)` 就能替代全关卡搜索，还能顺带拿到英雄的全部部件。
+
+实机结果是**有害的**：
+
+```
+FAILED GetRootComponent: attempt to call a TrivialObject value (method 'GetRootComponent')
+shadow: 0 part meshes on the hero
+```
+
+**这个 build 里 `AActor:GetRootComponent` 不能从 Lua 调用**（返回的是 UE4SS 的 `TrivialObject`，
+不是可调用的 UFunction）。于是「英雄组件树」永远是空的，而依赖它的两处都静默失效：
+
+- `hero_part_components` → 0 个部件 → **空白部件没有被移出阴影/主通道** → 角色脚下的地形开始
+  **闪黑**（就是 §6.5.11 那个老问题的翻版，这次表现为地面上的黑斑一闪一闪）；
+- 副本清扫若也改成「遍历副本 Actor 的组件树」，过场里**原版衣服会整片回来**（因为它同样拿不到 root）。
+
+教训：**在这个 build 里，凡是「从 Actor 拿根组件再往下走」的 API 都不能用**；
+枚举组件要用 `K2_GetComponentsByClass`（能用），或者直接用 `FindAllOf`。
+现在的实现回到「每轮一次 `FindAllOf` + 按名字缓存」，比原来的三次省 2/3，但没有换掉可靠的 API。
+
+> 判断这类问题的方法：日志里出现 `attempt to call a TrivialObject value` 就是「这个函数在本 build 里
+> 不存在」。`try` 会记一行，而依赖它的逻辑会**静默**退化成空集合——所以任何「把搜索换成遍历」的优化，
+> 都要在 dev 日志里确认产出数量（`targets: N weapon(s)` / `shadow: N part meshes`）不是 0。
+
+---
+
+### 6.26 轮询发现英雄的 bug：`state.tick` 只在 `setup()` 末尾自增
+
+把监听器换成「每 N 轮轮询一次玩家 Pawn」时，所有节奏（发现、重扫、冷却）都用 `state.tick` 表示，
+而 `state.tick` 是在 `setup()` 的**最后一个语句**里自增的。问题是 `setup()` 在没有英雄时会
+**提前 return**——于是 `state.tick` 永远停在 0：
+
+```
+第 1 轮: tick=0，discover_tick=nil → 允许发现 → 关卡还没加载完，什么也没找到 → discover_tick=0
+第 2 轮: tick 还是 0 → 0-0 < 4 → 跳过；以后每一轮都一样
+```
+
+表现就是**整局 mod 完全没生效**：原版衣服还在、可琳思娜不动、武器挂在魂身上。教训：
+
+- **计数器的自增不要放在「可能提前 return」的函数里**。现在在 `scan()` 的第一行自增。
+- 所有周期判断都依赖它，所以这类 bug 会一次性让「所有以轮为单位的机制」失效。
+- `tools/smoke_lua.py` 的 `late` 世界专门复现它：先跑几轮空世界，再注入英雄，断言之后能找到。
+  把自增移回 `setup()` 末尾，这个用例立刻失败（已验证）。
+
 ---
 
 ## 7. 运行期脚本（`ue4ss/KorinsnaRetarget`）
 
-`main.lua` 的结构：`boot()` → `NotifyOnNewObject` 监听新组件 → 每 `rescan_interval`（0.5s）跑一次
-`scan()`/`setup()`。所有开关在 `config.lua`（文件优先于脚本内默认值）。
+### 7.1 两个版本：release 与 dev
+
+脚本只有一份代码，两个安装版本：
+
+| 版本 | 安装命令 | 差异 | 用途 |
+| --- | --- | --- | --- |
+| **release**（默认） | `tools\install_lua.ps1` | `log_level=1`：**只在出问题时写日志**（健康的整局会话不会产生日志文件） | 游玩 |
+| **dev** | `tools\install_lua.ps1 -Profile dev` | 额外装 `config.dev.lua`：`log_level=2` 全量日志 + 各类只读普查（`report_*`） | 排障 / 开发 |
+
+**行为完全一致**：两个版本都注册 `NotifyOnNewObject` 监听器、都用同一套锚定与看门狗逻辑，
+差别只有日志和普查开关。所以 dev 里看到的现象就是 release 里会发生的事。
+
+`install_lua.ps1` 会先清空目标目录再拷，所以两个版本不会混在一起（`config.dev.lua` 只有 dev 才有）；
+它也顺手维护 `mods.json`，并清掉上一次的日志（`-KeepLog` 可保留）。
+
+> 为什么监听器不能只在 dev 里：它是唯一可靠的「英雄出现了」信号。曾经为了省开销改成轮询，
+> 结果因为一个计数器 bug 整局都没生效（§6.26）。卡顿从「每轮全关卡搜索」那里省（§6.25）。
+
+### 7.2 每轮扫描都做什么（性能预算）
+
+`scan()`（每 0.5 秒）→ `discover_hero()`（仅在英雄未知时真的查）→ `setup()` → `sweep_other_heroes()`。
+
+`setup()` 里**没有全关卡搜索**（§6.25）。每轮的实际工作量：
+
+| 动作 | 次数 | 说明 |
+| --- | --- | --- |
+| 全关卡搜索（武器/刀鞘/腰后刀） | 1 次 `FindAllOf("SkeletalMeshComponent")` | 结果按名字缓存，三个 job 共用（`target_rescan_scans=1`） |
+| 缓存解析 | 约 6 次 `StaticFindObject` | 3 件武器 / 鞘 / 刀，名字查表 |
+| 姿势看门狗 | 1–2 次属性读 + 4 次骨读 | `LeaderPoseComponent`、`GetPostProcessInstance`、骨位移兜底 |
+| `refresh_from_actor` | 1 次 `K2_GetComponentsByClass` | 约 25 个组件 |
+| 材质守卫 / 阴影 / 角色对齐 | 各 1 次 | 全是 O(1) |
+| 副本清扫 | 每 4 轮 / 有新副本时 | 5 个组件类各一次搜索，缓存在名字里 |
+| 日志 | release **不写** | 只有引擎调用失败 / scan 报错才写一行 |
+
+`main.lua` 的结构：`boot()` → 每 `rescan_interval`（0.5s）跑一次 `scan()`/`setup()`
+（dev 版本另外挂 `NotifyOnNewObject`）。所有开关在 `config.lua`（文件优先于脚本内默认值）。
 
 | 开关 | 默认 | 作用 |
 | --- | --- | --- |
@@ -687,7 +917,7 @@ end
 | `hide_source_visibility` | `true` | 隐藏原身体（姿势照常 tick） |
 | `force_anim_refresh` | `true` | 强制 `AlwaysTickPoseAndRefreshBones` + 关 URO |
 | `hide_scabbards` | `true` | 隐藏会乱飞的刀鞘（`back_items` 除外） |
-| `quiet_blank_parts` | `true` | 空白部件移出阴影/主通道（**只处理主角自己的组件**，见 §6.15） |
+| `quiet_blank_parts` / `quiet_parts_every` | `true` / `2` | 空白部件移出阴影/主通道（**只处理主角自己的组件**，见 §6.15），每 2 轮重申一次 |
 | `carrier_cast_shadow` | `false` | 承载网格不投影（避免黑斑） |
 | `attach_weapons` | `true` | 把手持武器 Actor 对齐到我们的手骨（§5.8） |
 | `grip_distance` | `{ r=6.0, l=6.0 }` | 握点距手骨的距离（cm），0 = 保持游戏值 |
@@ -697,12 +927,17 @@ end
 | `hide_copy_bodies` / `hide_copy_body_meshes` | `true` / `{ "Hun_Body_Simple" }` | 隐藏过场 / 预览副本上的原版身体（§6.19） |
 | `hide_hero_cloth` | `true` | 隐藏英雄的 Chaos Cloth 服装组件（§6.19） |
 | `hide_copy_outfit` | `true` | 副本上除承载网格与武器外全部隐藏（§6.19） |
-| `copy_rescan_scans` | `60` | 副本组件列表的重建周期（事件驱动之外的兜底，§6.19 的性能坑） |
-| `copy_rescan_min_scans` | `4` | 两次重建的最小间隔（过场里组件连续生成，避免每轮全扫，§6.22） |
-| `pose_watchdog` | `true` | 姿势卡住（游戏重设 leader pose）时重建重定向图，见 §6.17 |
-| `pose_step_move_cm` / `pose_step_stuck_cm` | `0.5` / `0.3` | 每轮分类阈值：原身体动、我们不动 → 记一次停滞 |
-| `pose_slip_window` / `pose_stuck_marks` | `12` / `4` | 滑动窗口与判决门槛（12 轮里 4 次停滞 ≈ 2 秒） |
+| `copy_rescan_scans` / `copy_rescan_min_scans` | `60` / `4` | 副本组件列表的重建周期与最小间隔（监听器发现新副本时会提前触发，§6.19 / §6.25） |
+| `target_rescan_scans` | `1` | 武器 / 刀鞘 / 腰后刀的全关卡搜索周期（每轮一次，三个 job 共用结果，§6.25） |
+| `discover_every` / `discover_audit_scans` | `4` / `60` | 英雄未知时的轮询间隔 / 已知后的审计间隔（监听器是主路径，§6.26） |
+| `pose_watchdog` | `true` | 姿势卡住（游戏重设 leader pose）时立刻清掉并重建，见 §6.17 |
+| `pose_bone_fallback` | `true` | 骨位移窗口兜底（慢速路径，§6.17） |
+| `pose_step_move_cm` / `pose_step_stuck_cm` | `0.5` / `0.3` | 每轮分类阈值（仅兜底路径使用） |
+| `pose_slip_window` / `pose_stuck_marks` | `12` / `4` | 滑动窗口与判决门槛（慢速路径，约 2 秒） |
+| `pose_big_jump_cm` | `20.0` | 单轮快判：原身体动了超过这个距离而我们完全没动 → 直接判定（实测一拍 98.8 cm，0.5 秒内恢复） |
 | `pose_heal_cooldown` | `6` | 两次重建之间的最小扫描间隔 |
+| `pose_weapon_wait` | `2` | 重建后等几轮再重新锚定武器（§5.8.2） |
+| `log_level` | `1` | 0 静默 / 1 只写出问题的行（release）/ 2 全量（dev 用 2） |
 | `report_pose_window` | `false` | 打印看门狗自身视角的计数（排障，§8.6） |
 | `material_guard` | `[0] = ".../MI_ZeroHun_Cloth_04_b"` | 被游戏换掉的材质槽，每轮把目标实例换回去，见 §6.18 |
 | `report_materials` | `false` | 打印 8 个槽实际使用的材质实例名（排障，见 §6.18） |
@@ -799,6 +1034,28 @@ python tools\dump_crash.py "K:\SteamLibrary\steamapps\common\PBZ\platform\steam\
   里 `KorinsnaRetarget` 关掉，复现一遍再判断。
 - 崩溃前后**脚本最后一行**很有用：日志是逐行追加的，最后一行就是崩溃瞬间脚本正在做的事。
 
+### 8.9 判断「浮空是骨盆没动，还是本体本来就高」
+
+`ue4ss/KorinsnaRetarget/config.lua` 里打开：
+
+```lua
+report_ground_every = 2,   -- 每 2 次扫描（约 1 秒）打一行
+```
+
+每行形如：
+
+```
+ground: pelvis src -1240.1 ours -1189.4 (+50.7) | foot src -1282.7 ours -1219.9 (+62.8) | actor -1188.2 | ball_l/Bip001-L-Toe0
+```
+
+- **`ours pelvis` 在一整场里是个常数** → 骨盆根本没被重定向（§5.12 / §6.24），不是比例问题；
+- **两边都跟着姿势变、只是差一个常量 Δ** → 那是比例/参考姿态的常量偏移，用 Pelvis Motion 的
+  `TranslationOffsetGlobal.Z` 或 `BlendToSourceTranslation` 补偿；
+- `foot` 那一列只是参考：`ball_l` 和 `Bip001-L-Toe0` 相对鞋底的高度不同，Δ 有十来厘米是正常的，
+  **不要**用脚骨 Z 去做对齐补偿。
+
+`foot` 后面的 `ball_l/Bip001-L-Toe0` 是实际取到的骨名（左右取到哪根就写哪根）。
+
 ---
 
 ## 9. 附录：已废弃的「重新蒙皮到游戏骨架」路线
@@ -816,14 +1073,16 @@ python tools\dump_crash.py "K:\SteamLibrary\steamapps\common\PBZ\platform\steam\
 ## 10. 已知不足与后续方向
 | 项目 | 现状 | 后续思路 |
 | --- | --- | --- |
-| 手指动画 | 不做，绑定姿态是握拳 | 逐骨 retarget-pose 偏移 + ABP 手部 IK |
+| 手指动画 | 已做：A-pose 绑定姿态 + 逐关节切段（§5.4），指节干净 | 若某些手势出现指节穿插，改 `ue/retarget_config.json` 里对应那一节的旋转权重/关闭该节 |
 | 头部 | 只用 Neck 链跟随，脸不参与 | 给 `head_Bone001/002` 单独建链 + 逐骨偏移 |
 | 裙摆 | 刚体（不参与重定向） | 换成 Chaos Cloth，或用正确的骨骼映射重新做链 |
-| 扭转骨轴向限制 | 未实现（IK Retargeter 只有链级模式） | 在 ABP 里加约束节点，只保留绕骨轴的旋转 |
+| 扭转骨轴向限制 | 切段后每段刚性复制同一关节（§5.6），没有「只绕骨轴」的限制 | 若仍出现糖果纸扭曲，在 ABP 里加约束节点 |
 | 衣服质感 | 中性 ARM：全粗糙、非金属 | 想要一点高光时把 `_ARM` 的 G 改成 180（参考 2B mod 的值） |
 | 皮肤颜色 | 可琳思娜的腿/手本来就接近白色，槽 1 借的 `Cloth_02_b` 会再混一点布料噪点 | 想更干净时把槽 1 也换成纯底色实例（要同时换它唯一的 albedo 贴图路径） |
 | 游戏换材质 | 只守住槽 0（受伤头材质），玩家与过场副本都守（§6.18 / §6.21） | 若别的槽也被换掉，往 `material_guard` 里加条目 |
 | 跨扫描缓存 | 只存对象名，用前 `StaticFindObject` 重新解析（§6.22） | 若有新的缓存需求，沿用这个模式，不要保存 UObject 引用 |
+| 运行期开销 | 每轮一次全关卡搜索（原为三次）、release 不写日志（§6.25） | 任何「把搜索换成遍历组件树」的优化都要先确认产出数量不是 0（`GetRootComponent` 在本 build 不可用，§6.25.1） |
+| 姿势恢复 | 直接读 `LeaderPoseComponent`，下一轮即恢复（§6.17） | 若某天该属性读不到，`pose_bone_fallback` 仍会兜底（慢 ~2 秒） |
 | 武器握点 | 手骨距离按左手/右手各一个常数 | 按武器类型细分（斧/刀/钩的握点不同） |
 | 收起的武器 | 挂到 `Bip001-Spine` + 沿背面外推 2cm（§5.8.1） | 若某类大武器在背上穿模，可按武器类型给不同的锚骨/外推 |
 | 姿势丢失 | 看门狗 2 秒内重建（§6.17） | 若能找到游戏重设 leader pose 的那个调用点，可在源头阻止而不是事后重建 |

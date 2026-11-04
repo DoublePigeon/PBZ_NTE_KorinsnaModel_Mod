@@ -8,21 +8,22 @@
       hero's own parts,
     * the UE4SS mod adds the Korinsna component at runtime and points it at that anim blueprint.
 
+  The Lua half comes in two flavours (see tools/install_lua.ps1): `release` (default, no object
+  listeners) and `dev` (adds the listeners and the verbose diagnostics).
+
   The game must be closed while copying; the containers are locked otherwise.
 #>
 param(
     [string]$GameRoot = "K:\SteamLibrary\steamapps\common\PBZ",
     [string]$RepoRoot = "J:\VS_Projects\PBZ_KorinsnaSkinMod",
-    [string]$Name = "ProjectPBZ-Korinsna-Windows_P"
+    [string]$Name = "ProjectPBZ-Korinsna-Windows_P",
+    [ValidateSet("release", "dev")][string]$Profile = "release"
 )
 
 $ErrorActionPreference = "Stop"
 
 $dist = Join-Path $RepoRoot "dist\Korinsna"
 $mods = Join-Path $GameRoot "ProjectPBZ\Content\Paks\~mods"
-$ue4ssMods = Join-Path $GameRoot "platform\steam\ue4ss\Mods"
-$modSource = Join-Path $RepoRoot "ue4ss\KorinsnaRetarget"
-$modTarget = Join-Path $ue4ssMods "KorinsnaRetarget"
 
 # ---------------------------------------------------------------- container
 if (-not (Test-Path $mods)) { New-Item -ItemType Directory -Force -Path $mods | Out-Null }
@@ -34,22 +35,5 @@ foreach ($ext in "pak", "utoc", "ucas") {
 Get-ChildItem $mods -Filter "$Name.*" | Format-Table Length, Name -AutoSize
 
 # ---------------------------------------------------------------- ue4ss mod
-if (-not (Test-Path $ue4ssMods)) { throw "UE4SS is not installed in $GameRoot" }
-if (Test-Path $modTarget) { Remove-Item $modTarget -Recurse -Force }
-New-Item -ItemType Directory -Force -Path $modTarget | Out-Null
-Copy-Item (Join-Path $modSource "*") $modTarget -Recurse -Force
-Get-ChildItem $modTarget -Recurse -File | Select-Object Length, FullName | Format-Table -AutoSize
-
-# UE4SS reads mods.json; keep the existing entries and just make sure ours is enabled
-$modsJson = Join-Path $ue4ssMods "mods.json"
-$entries = New-Object System.Collections.ArrayList
-if (Test-Path $modsJson) {
-    $parsed = Get-Content $modsJson -Raw | ConvertFrom-Json
-    foreach ($entry in $parsed) {
-        if ($entry.mod_name -ne "KorinsnaRetarget") { [void]$entries.Add($entry) }
-    }
-}
-[void]$entries.Add([pscustomobject]@{ mod_name = "KorinsnaRetarget"; mod_enabled = $true })
-Set-Content -Path $modsJson -Value (ConvertTo-Json -InputObject @($entries) -Depth 4) -Encoding UTF8
-Write-Host "mods.json updated:"
-Get-Content $modsJson
+# Same folder for both flavours; the script removes the previous flavour's extra files.
+& (Join-Path $RepoRoot "tools\install_lua.ps1") -Profile $Profile -GameRoot $GameRoot -RepoRoot $RepoRoot

@@ -22,13 +22,14 @@
 | 模型 / 朝向 / 站立高度 | ✅ |
 | 全身动画（重定向） | ✅ |
 | 骨折不拉伸、四肢形变 | ✅ |
-| 手指 | ✅ 静态握拳（不参与重定向） |
+| 手指 | ✅ 动态（逐关节重定向，A-pose 绑定姿态） |
 | 裙摆 | ✅ 刚体跟随，不乱穿模 |
 | 材质 / 受光 / 阴影 | ✅ |
 | 原版外观清除 | ✅ 全身（含长袍与长发） |
 | 手持武器跟随并握在手里 | ✅ |
 | 腰后短刀与刀鞘 | ✅ 锚定在背部 |
-| 手指动画 / 头发与裙摆物理 | ❌ 未实现（见技术指导的「已知不足」） |
+| 运行时开销 | ✅ 每轮一次全关卡搜索（原为三次）；release 不写日志（技术指导 §6.25） |
+| 头发与裙摆物理 | ❌ 未实现（见技术指导的「已知不足」） |
 
 ## 需求
 
@@ -41,18 +42,29 @@
 
 **先关闭游戏。**
 
-1. 把 `dist/Korinsna/` 下的三个文件复制到 `<游戏目录>\ProjectPBZ\Content\Paks\~mods\`
+`Release\` 已经是整理好的分发包（`tools\make_release.ps1` 生成）：
+
+```
+Release\KorinsnaModel\       ->  <游戏目录>\ProjectPBZ\Content\Paks\~mods\
+Release\KorinsnaRetarget\    ->  <游戏目录>\platform\steam\ue4ss\Mods\
+```
+
+1. 把 `Release\KorinsnaModel\` 里的三个文件复制到 `<游戏目录>\ProjectPBZ\Content\Paks\~mods\`
    （目录不存在就自己建）：
 
    - `ProjectPBZ-Korinsna-Windows_P.pak`
    - `ProjectPBZ-Korinsna-Windows_P.utoc`
    - `ProjectPBZ-Korinsna-Windows_P.ucas`
 
-2. 把 `ue4ss/KorinsnaRetarget/` 复制到
+2. 把 `Release\KorinsnaRetarget\` 整个文件夹复制到
    `<游戏目录>\platform\steam\ue4ss\Mods\KorinsnaRetarget\`，
    并在 `platform\steam\ue4ss\Mods\mods.json` 里启用它。
 
    `tools\install_mod.ps1` 会自动完成上面两步（含 `mods.json`）。
+
+   只想更新 Lua 半边（不需要重新 cook）时用 `tools\install_lua.ps1`：
+   默认装 **release**（只在出问题时写日志，游玩用）；`-Profile dev` 装 **dev**（全量日志 + 普查，排障用）。
+   两个版本行为一致，见 TECHNICAL-GUIDE §7.1。
 
 3. 启动游戏，进入存档即可看到替换后的主角。
 

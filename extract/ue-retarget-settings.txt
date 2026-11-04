@@ -1,0 +1,33 @@
+ops: 6
+op[00] Pelvis Motion            enabled=True  controller=IKRetargetPelvisMotionController
+op[01] FK Chains                enabled=True  controller=IKRetargetFKChainsController
+op[02] Retarget IK Goals        enabled=False controller=IKRetargetIKChainsController
+op[03] Run IK Rig               enabled=False controller=IKRetargetRunIKRigController
+op[04] Root Motion              enabled=True  controller=IKRetargetRootMotionController
+op[05] Remap Curves             enabled=False controller=IKRetargetCurveRemapController
+chains in op: 19
+  Root             enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  Spine            enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  Neck             enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  LeftClavicle     enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  RightClavicle    enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  LeftArmUpper     enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  LeftArmLower     enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  LeftHand         enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  LeftThigh        enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  LeftCalf         enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  LeftFoot         enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  LeftToe          enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  RightArmUpper    enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  RightArmLower    enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  RightHand        enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  RightThigh       enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  RightCalf        enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  RightFoot        enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+  RightToe         enableFK=True  rot=<FKChainRotationMode.INTERPOLATED: 0> rotA=1.00 trans=<FKChainTranslationMode.NONE: 0> transA=1.00
+Pelvis Motion: <Struct 'IKRetargetPelvisMotionOpSettings' (0x0000016664ACE100) {lod_threshold: -1, source_crotch_offset: 0.000000, target_crotch_offset: 0.000000, rotation_alpha: 1.000000, rotation_offset_local: {pitch: 0.000000, yaw: 0.000000, roll: 0.000000}, rotation_offset_global: {pitch: 0.000000, yaw: 0.000000, roll: 0.000000}, translation_alpha: 1.000000, translation_offset_local: {x: 0.000000, y: 0.000000, z: 0.000000}, translation_offset_global: {x: 0.000000, y: 0.000000, z: 0.000000}, blend_to_source_translation: 0.000000, blend_to_source_translation_weights: {x: 1.000000, y: 1.000000, z: 1.000000}, scale_horizontal: 1.000000, scale_vertical: 1.000000, affect_ik_horizontal: 1.000000, affect_ik_vertical: 0.000000}>
+   rotation_alpha         = 1.0
+   translation_alpha      = 1.0
+   scale_horizontal       = 1.0
+   scale_vertical         = 1.0
+Root Motion: <Struct 'IKRetargetRootMotionOpSettings' (0x00000166669A3840) {lod_threshold: -1, root_motion_source: CopyFromSourceRoot, rotate_with_pelvis: False, root_height_source: CopyHeightFromSource, global_offset: {rotation: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}, translation: {x: 0.000000, y: 0.000000, z: 0.000000}, scale3d: {x: 1.000000, y: 1.000000, z: 1.000000}}, maintain_offset_from_pelvis: True, propagate_to_non_retargeted_children: True}>

@@ -1,0 +1,787 @@
+{
+  "_readme": [
+    "骨骼 / 链 —— IK Retargeter 的唯一配置来源。",
+    "ue/scripts/build_retarget_assets.py 只读这个文件，不再按名字前缀猜某根骨该不该参与",
+    "（以前用 name.startswith('LeftHandThumb') / 'LeftSkirt' 之类的字符串判断，容易出错）。",
+    "",
+    "retarget = false 的链仍列在这里，但不会加进 IK Rig / Retargeter，骨骼停在绑定姿态。",
+    "",
+    "字段：",
+    "  name            链名，两个 IK Rig 共用（Retargeter 靠链名映射）",
+    "  retarget        是否参与重定向",
+    "  source          源（魂）链的起止骨 [start, end]，单骨链两边写同一个",
+    "  target          目标（可琳思娜）链的起止骨 [start, end]",
+    "  enable_fk       FK 是否启用",
+    "  rotation_mode   Interpolated / OneToOne / OneToOneReversed / MatchChain /",
+    "                  MatchScaledChain / None / CopyLocal",
+    "  rotation_alpha  旋转权重 0..1",
+    "  translation_mode None / GloballyScaled / Absolute / StretchBoneLengthUniformly /",
+    "                  StretchBoneLengthNonUniformly / OrientAndScale",
+    "  translation_alpha 位移权重 0..1",
+    "  note            为什么这样设（改之前先读）"
+  ],
+  "ops": {
+    "Pelvis Motion": true,
+    "FK Chains": true,
+    "Retarget IK Goals": false,
+    "Run IK Rig": false,
+    "Root Motion": true,
+    "Remap Curves": false
+  },
+  "_ops_note": "IK 两个 op 必须关闭：目标 IK Rig 没有 goal/solver，打开会崩游戏（TECHNICAL-GUIDE §6.12）",
+  "defaults": {
+    "enable_fk": true,
+    "rotation_mode": "Interpolated",
+    "rotation_alpha": 1.0,
+    "translation_mode": "None",
+    "translation_alpha": 1.0
+  },
+  "_defaults_note": "IK_check 第 1 项：除根骨/骨盆外，所有链的 TranslationMode = None（骨骼保留自己的长度，不被源角色拉长）。骨盆的位移由 Pelvis Motion op 处理。",
+  "chains": [
+    {
+      "name": "Root",
+      "retarget": true,
+      "source": [
+        "Root",
+        "Root"
+      ],
+      "target": [
+        "Root",
+        "Root"
+      ],
+      "translation_mode": "GloballyScaled",
+      "note": "根骨保留位移与缩放，否则角色不在空间里移动"
+    },
+    {
+      "name": "Spine",
+      "retarget": true,
+      "source": [
+        "spine_01",
+        "spine_05"
+      ],
+      "target": [
+        "Bip001-Spine",
+        "Bip001-Spine1"
+      ],
+      "note": "骨盆不能出现在任何链里。FK 链 op 的 TranslationMode=None 会把链上每根骨的位置重新按参考姿态摆放，而骨盆是链的首骨（父级为空），于是每次求值都被钉回参考姿态高度：站立看起来正常，但蹲下/坐下/躺下时游戏本体骨盆下降 50-60 cm，我们的骨盆一动不动，整个人就浮在空中（日志 ground: pelvis src -1240 ours -1189）。骨盆只交给 Pelvis Motion op（引擎对“不属于任何链的骨盆”就是这么处理的），所以这条链从 spine_01 开始。"
+    },
+    {
+      "name": "Neck",
+      "retarget": true,
+      "source": [
+        "neck_01",
+        "neck_02"
+      ],
+      "target": [
+        "Bip001-Neck",
+        "Bip001-Neck"
+      ]
+    },
+    {
+      "name": "Head",
+      "retarget": false,
+      "source": [
+        "Head",
+        "Head"
+      ],
+      "target": [
+        "head_Bone001",
+        "head_Bone001"
+      ],
+      "note": "可琳思娜的脸蒙在 head_Bone001/002 上，枢轴与魂的 Head 不同，跟随会把脸拽变形；头靠 Neck 链跟随"
+    },
+    {
+      "name": "LeftClavicle",
+      "retarget": true,
+      "source": [
+        "clavicle_l",
+        "clavicle_l"
+      ],
+      "target": [
+        "Bip001-L-Clavicle",
+        "Bip001-L-Clavicle"
+      ]
+    },
+    {
+      "name": "RightClavicle",
+      "retarget": true,
+      "source": [
+        "clavicle_r",
+        "clavicle_r"
+      ],
+      "target": [
+        "Bip001-R-Clavicle",
+        "Bip001-R-Clavicle"
+      ]
+    },
+    {
+      "name": "LeftArmUpper",
+      "retarget": true,
+      "source": [
+        "upperarm_l",
+        "upperarm_l"
+      ],
+      "target": [
+        "Bip001-L-UpperArm",
+        "Bone-L-UpperArm-Twist1"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "LeftArmLower",
+      "retarget": true,
+      "source": [
+        "lowerarm_l",
+        "lowerarm_l"
+      ],
+      "target": [
+        "Bip001-L-Forearm",
+        "Bone-L-ForeArm-Twist1"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "LeftThigh",
+      "retarget": true,
+      "source": [
+        "thigh_l",
+        "thigh_l"
+      ],
+      "target": [
+        "Bip001-L-Thigh",
+        "Bone-L-Thigh-Twist1"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "LeftCalf",
+      "retarget": true,
+      "source": [
+        "calf_l",
+        "calf_l"
+      ],
+      "target": [
+        "Bip001-L-Calf",
+        "Bone-L-Calf-Twist1"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "LeftFoot",
+      "retarget": true,
+      "source": [
+        "foot_l",
+        "foot_l"
+      ],
+      "target": [
+        "Bip001-L-Foot",
+        "Bip001-L-Foot"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "LeftToe",
+      "retarget": true,
+      "source": [
+        "ball_l",
+        "ball_l"
+      ],
+      "target": [
+        "Bip001-L-Toe0",
+        "Bip001-L-Toe0"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "RightArmUpper",
+      "retarget": true,
+      "source": [
+        "upperarm_r",
+        "upperarm_r"
+      ],
+      "target": [
+        "Bip001-R-UpperArm",
+        "Bone-R-UpperArm-Twist1"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "RightArmLower",
+      "retarget": true,
+      "source": [
+        "lowerarm_r",
+        "lowerarm_r"
+      ],
+      "target": [
+        "Bip001-R-Forearm",
+        "Bone-R-ForeArm-Twist1"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "RightHand",
+      "retarget": true,
+      "source": [
+        "hand_r",
+        "hand_r"
+      ],
+      "target": [
+        "Bip001-R-Hand",
+        "Bip001-R-Hand"
+      ],
+      "note": "手腕骨本身：源链单骨，目标链单骨，刚性复制手的旋转。手指各节在 Hand 之后另开链（见 §5.6）。"
+    },
+    {
+      "name": "LeftHand",
+      "retarget": true,
+      "source": [
+        "hand_l",
+        "hand_l"
+      ],
+      "target": [
+        "Bip001-L-Hand",
+        "Bip001-L-Hand"
+      ],
+      "note": "手腕骨本身：源链单骨，目标链单骨，刚性复制手的旋转。手指各节在 Hand 之后另开链（见 §5.6）。"
+    },
+    {
+      "name": "RightThigh",
+      "retarget": true,
+      "source": [
+        "thigh_r",
+        "thigh_r"
+      ],
+      "target": [
+        "Bip001-R-Thigh",
+        "Bone-R-Thigh-Twist1"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "RightCalf",
+      "retarget": true,
+      "source": [
+        "calf_r",
+        "calf_r"
+      ],
+      "target": [
+        "Bip001-R-Calf",
+        "Bone-R-Calf-Twist1"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "RightFoot",
+      "retarget": true,
+      "source": [
+        "foot_r",
+        "foot_r"
+      ],
+      "target": [
+        "Bip001-R-Foot",
+        "Bip001-R-Foot"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "RightToe",
+      "retarget": true,
+      "source": [
+        "ball_r",
+        "ball_r"
+      ],
+      "target": [
+        "Bip001-R-Toe0",
+        "Bip001-R-Toe0"
+      ],
+      "note": "IK_check item 3: the target has twist bones inside the limb path (arm 7 bones, leg 8) and the retargeter interpolates the joint bend into them, which is what bent the limb into an arch. A chain cannot skip a bone on the path and chains may not overlap, so each limb is split into adjacent segments that end on the last twist bone: every segment then maps to a single-bone source chain and copies that joint's rotation rigidly."
+    },
+    {
+      "name": "LeftThumb1",
+      "retarget": true,
+      "source": [
+        "thumb_01_l",
+        "thumb_01_l"
+      ],
+      "target": [
+        "Bip001-L-Finger0",
+        "Bip001-L-Finger0"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftThumb2",
+      "retarget": true,
+      "source": [
+        "thumb_02_l",
+        "thumb_02_l"
+      ],
+      "target": [
+        "Bip001-L-Finger01",
+        "Bip001-L-Finger01"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftThumb3",
+      "retarget": true,
+      "source": [
+        "thumb_03_l",
+        "thumb_03_l"
+      ],
+      "target": [
+        "Bip001-L-Finger02",
+        "Bip001-L-Finger02"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftIndex1",
+      "retarget": true,
+      "source": [
+        "index_01_l",
+        "index_01_l"
+      ],
+      "target": [
+        "Bip001-L-Finger1",
+        "Bip001-L-Finger1"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftIndex2",
+      "retarget": true,
+      "source": [
+        "index_02_l",
+        "index_02_l"
+      ],
+      "target": [
+        "Bip001-L-Finger11",
+        "Bip001-L-Finger11"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftIndex3",
+      "retarget": true,
+      "source": [
+        "index_03_l",
+        "index_03_l"
+      ],
+      "target": [
+        "Bip001-L-Finger12",
+        "Bip001-L-Finger12"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftMiddle1",
+      "retarget": true,
+      "source": [
+        "middle_01_l",
+        "middle_01_l"
+      ],
+      "target": [
+        "Bip001-L-Finger2",
+        "Bip001-L-Finger2"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftMiddle2",
+      "retarget": true,
+      "source": [
+        "middle_02_l",
+        "middle_02_l"
+      ],
+      "target": [
+        "Bip001-L-Finger21",
+        "Bip001-L-Finger21"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftMiddle3",
+      "retarget": true,
+      "source": [
+        "middle_03_l",
+        "middle_03_l"
+      ],
+      "target": [
+        "Bip001-L-Finger22",
+        "Bip001-L-Finger22"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftRing1",
+      "retarget": true,
+      "source": [
+        "ring_01_l",
+        "ring_01_l"
+      ],
+      "target": [
+        "Bip001-L-Finger3",
+        "Bip001-L-Finger3"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftRing2",
+      "retarget": true,
+      "source": [
+        "ring_02_l",
+        "ring_02_l"
+      ],
+      "target": [
+        "Bip001-L-Finger31",
+        "Bip001-L-Finger31"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftRing3",
+      "retarget": true,
+      "source": [
+        "ring_03_l",
+        "ring_03_l"
+      ],
+      "target": [
+        "Bip001-L-Finger32",
+        "Bip001-L-Finger32"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftPinky1",
+      "retarget": true,
+      "source": [
+        "pinky_01_l",
+        "pinky_01_l"
+      ],
+      "target": [
+        "Bip001-L-Finger4",
+        "Bip001-L-Finger4"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftPinky2",
+      "retarget": true,
+      "source": [
+        "pinky_02_l",
+        "pinky_02_l"
+      ],
+      "target": [
+        "Bip001-L-Finger41",
+        "Bip001-L-Finger41"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftPinky3",
+      "retarget": true,
+      "source": [
+        "pinky_03_l",
+        "pinky_03_l"
+      ],
+      "target": [
+        "Bip001-L-Finger42",
+        "Bip001-L-Finger42"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightThumb1",
+      "retarget": true,
+      "source": [
+        "thumb_01_r",
+        "thumb_01_r"
+      ],
+      "target": [
+        "Bip001-R-Finger0",
+        "Bip001-R-Finger0"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightThumb2",
+      "retarget": true,
+      "source": [
+        "thumb_02_r",
+        "thumb_02_r"
+      ],
+      "target": [
+        "Bip001-R-Finger01",
+        "Bip001-R-Finger01"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightThumb3",
+      "retarget": true,
+      "source": [
+        "thumb_03_r",
+        "thumb_03_r"
+      ],
+      "target": [
+        "Bip001-R-Finger02",
+        "Bip001-R-Finger02"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightIndex1",
+      "retarget": true,
+      "source": [
+        "index_01_r",
+        "index_01_r"
+      ],
+      "target": [
+        "Bip001-R-Finger1",
+        "Bip001-R-Finger1"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightIndex2",
+      "retarget": true,
+      "source": [
+        "index_02_r",
+        "index_02_r"
+      ],
+      "target": [
+        "Bip001-R-Finger11",
+        "Bip001-R-Finger11"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightIndex3",
+      "retarget": true,
+      "source": [
+        "index_03_r",
+        "index_03_r"
+      ],
+      "target": [
+        "Bip001-R-Finger12",
+        "Bip001-R-Finger12"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightMiddle1",
+      "retarget": true,
+      "source": [
+        "middle_01_r",
+        "middle_01_r"
+      ],
+      "target": [
+        "Bip001-R-Finger2",
+        "Bip001-R-Finger2"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightMiddle2",
+      "retarget": true,
+      "source": [
+        "middle_02_r",
+        "middle_02_r"
+      ],
+      "target": [
+        "Bip001-R-Finger21",
+        "Bip001-R-Finger21"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightMiddle3",
+      "retarget": true,
+      "source": [
+        "middle_03_r",
+        "middle_03_r"
+      ],
+      "target": [
+        "Bip001-R-Finger22",
+        "Bip001-R-Finger22"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightRing1",
+      "retarget": true,
+      "source": [
+        "ring_01_r",
+        "ring_01_r"
+      ],
+      "target": [
+        "Bip001-R-Finger3",
+        "Bip001-R-Finger3"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightRing2",
+      "retarget": true,
+      "source": [
+        "ring_02_r",
+        "ring_02_r"
+      ],
+      "target": [
+        "Bip001-R-Finger31",
+        "Bip001-R-Finger31"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightRing3",
+      "retarget": true,
+      "source": [
+        "ring_03_r",
+        "ring_03_r"
+      ],
+      "target": [
+        "Bip001-R-Finger32",
+        "Bip001-R-Finger32"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightPinky1",
+      "retarget": true,
+      "source": [
+        "pinky_01_r",
+        "pinky_01_r"
+      ],
+      "target": [
+        "Bip001-R-Finger4",
+        "Bip001-R-Finger4"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightPinky2",
+      "retarget": true,
+      "source": [
+        "pinky_02_r",
+        "pinky_02_r"
+      ],
+      "target": [
+        "Bip001-R-Finger41",
+        "Bip001-R-Finger41"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "RightPinky3",
+      "retarget": true,
+      "source": [
+        "pinky_03_r",
+        "pinky_03_r"
+      ],
+      "target": [
+        "Bip001-R-Finger42",
+        "Bip001-R-Finger42"
+      ],
+      "note": "手指逐关节切段：源链是单骨链、目标链只有一根骨，于是每节指骨刚性复制魂对应那一节的旋转。源手掌比我们多一层 metacarpal（index_metacarpal_* 等），它们不在任何链里，目标也没有对应骨，保持参考姿态即可。绑定姿态已换成 npc_036_APOSE.blend（张开一些）。"
+    },
+    {
+      "name": "LeftSkirtA",
+      "retarget": false,
+      "source": [
+        "bns_skirt_0_01_l",
+        "bns_skirt_0_05_l"
+      ],
+      "target": [
+        "l_skirt_1",
+        "l_skirt_5"
+      ],
+      "note": "裙链是按几何位置手工映射的，动起来会把裙子甩进腿里；关闭后裙摆保持建模形状"
+    },
+    {
+      "name": "RightSkirtA",
+      "retarget": false,
+      "source": [
+        "bns_skirt_0_01_r",
+        "bns_skirt_0_05_r"
+      ],
+      "target": [
+        "r_skirt_1",
+        "r_skirt_5"
+      ]
+    },
+    {
+      "name": "LeftSkirtB",
+      "retarget": false,
+      "source": [
+        "bns_skirt_1_01_l",
+        "bns_skirt_1_05_l"
+      ],
+      "target": [
+        "l_skirt_7",
+        "l_skirt_11"
+      ]
+    },
+    {
+      "name": "RightSkirtB",
+      "retarget": false,
+      "source": [
+        "bns_skirt_1_01_r",
+        "bns_skirt_1_05_r"
+      ],
+      "target": [
+        "r_skirt_7",
+        "r_skirt_11"
+      ]
+    },
+    {
+      "name": "LeftSkirtC",
+      "retarget": false,
+      "source": [
+        "bns_skirt_2_01_l",
+        "bns_skirt_2_05_l"
+      ],
+      "target": [
+        "l_skirt_13",
+        "l_skirt_17"
+      ]
+    },
+    {
+      "name": "RightSkirtC",
+      "retarget": false,
+      "source": [
+        "bns_skirt_2_01_r",
+        "bns_skirt_2_05_r"
+      ],
+      "target": [
+        "r_skirt_13",
+        "r_skirt_17"
+      ]
+    },
+    {
+      "name": "BackSkirt",
+      "retarget": false,
+      "source": [
+        "bns_skirt_3_01",
+        "bns_skirt_3_05"
+      ],
+      "target": [
+        "b_skirt_1",
+        "b_skirt_5"
+      ]
+    },
+    {
+      "name": "FrontSkirt",
+      "retarget": false,
+      "source": [
+        "bns_frontSkirtArmorRibbon_01",
+        "bns_frontSkirtArmorRibbon_05"
+      ],
+      "target": [
+        "m_skirt_1",
+        "m_skirt_5"
+      ]
+    }
+  ]
+}

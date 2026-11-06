@@ -18,19 +18,32 @@ class PROJECTPBZ_API UKorinsnaEditorLibrary : public UBlueprintFunctionLibrary
 
 public:
 	/**
-	 * Creates (or recreates) an animation blueprint whose graph is a single
-	 * "Retarget Pose From Mesh" node wired into the output pose.
+	 * Creates (or recreates) an animation blueprint whose graph is a
+	 * "Retarget Pose From Mesh" node wired into the output pose, optionally followed by a chain of
+	 * KawaiiPhysics nodes (hair / skirt physics) configured from a JSON file.
 	 *
 	 * The node reads its source pose from the skeletal mesh component it is attached to, so
 	 * the runtime mod only has to parent the Korinsna component under the game's own body
 	 * component - no runtime property setup is needed.
 	 *
-	 * @param AssetPath       object path of the anim blueprint to create, e.g. /Game/Korinsna/ABP_Korinsna_Retarget
-	 * @param SkeletonPath    object path of the target (Korinsna) skeleton
-	 * @param RetargeterPath  object path of the IK Retargeter asset
+	 * @param AssetPath         object path of the anim blueprint to create, e.g. /Game/Korinsna/ABP_Korinsna_Retarget
+	 * @param SkeletonPath      object path of the target (Korinsna) skeleton
+	 * @param RetargeterPath    object path of the IK Retargeter asset
+	 * @param PhysicsConfigPath absolute path of ue/kawaii_config.json; empty = retarget only
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Korinsna")
-	static bool CreateRetargetAnimBlueprint(const FString& AssetPath, const FString& SkeletonPath, const FString& RetargeterPath);
+	static bool CreateRetargetAnimBlueprint(const FString& AssetPath, const FString& SkeletonPath,
+		const FString& RetargeterPath, const FString& PhysicsConfigPath);
+
+	/**
+	 * Describes the KawaiiPhysics nodes of an already saved blueprint: graph order, root bone of each
+	 * node, the physics settings that were applied, and how many collision spheres each carries.
+	 *
+	 * The runtime log cannot show any of this, and a node whose RootBone did not resolve looks exactly
+	 * like a node whose settings are wrong - so the build has to prove what it authored.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Korinsna")
+	static FString DescribeKawaiiPhysics(const FString& AssetPath);
 
 	/**
 	 * Describes the anim graph of an already saved retarget blueprint: node classes, the retarget

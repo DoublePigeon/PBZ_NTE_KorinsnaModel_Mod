@@ -6,6 +6,37 @@ graph AnimGraph
   node AnimGraphNode_RetargetPoseFromMesh_0 class=AnimGraphNode_RetargetPoseFromMesh
     source mode=parent component
     retargeter=/Game/Korinsna/RTG_HunToKorinsna.RTG_HunToKorinsna
+  node AnimGraphNode_KawaiiPhysics_0 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_1 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_2 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_3 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_4 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_5 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_6 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_7 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_8 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_9 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_10 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_11 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_12 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_13 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_14 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_15 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_16 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_17 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_18 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_19 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_20 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_21 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_22 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_23 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_24 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_25 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_26 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_27 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_KawaiiPhysics_28 class=AnimGraphNode_KawaiiPhysics
+  node AnimGraphNode_LocalToComponentSpace_0 class=AnimGraphNode_LocalToComponentSpace
+  node AnimGraphNode_ComponentToLocalSpace_0 class=AnimGraphNode_ComponentToLocalSpace
 
 == meshes
 carrier /HuaShira/Characters/Hero/Hero_Hun/SkinParts/Hun_Head_New.Hun_Head_New skeleton=/Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton post_bp=/Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C slots=8

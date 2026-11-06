@@ -1,0 +1,38 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.KawaiiPhysics.cpp.obj": [
+			"KawaiiPhysics.init.gen.cpp.obj",
+			"KawaiiPhysicsBoneConstraintTypes.gen.cpp.obj",
+			"KawaiiPhysicsCollisionLimits.gen.cpp.obj",
+			"KawaiiPhysicsSharedCollisionSubsystem.gen.cpp.obj",
+			"KawaiiPhysicsSharedCollisionTypes.gen.cpp.obj",
+			"KawaiiPhysicsTypes.gen.cpp.obj",
+			"AnimNode_KawaiiPhysics.cpp.obj",
+			"AnimNode_KawaiiPhysicsCollision.cpp.obj",
+			"AnimNode_KawaiiPhysicsDebug.cpp.obj",
+			"AnimNode_KawaiiPhysicsModifyBones.cpp.obj",
+			"AnimNode_KawaiiPhysicsSimulation.cpp.obj",
+			"AnimNode_KawaiiPhysicsSyncBone.cpp.obj",
+			"AnimNotifyState_KawaiiPhysicsAddExternalForce.cpp.obj",
+			"AnimNotifyState_KawaiiPhysicsSetAlpha.cpp.obj",
+			"AnimNotify_KawaiiPhysicsAddExternalForce.cpp.obj",
+			"KawaiiPhysicsExternalForce.cpp.obj",
+			"KawaiiPhysicsExternalForce_Basic.cpp.obj",
+			"KawaiiPhysicsExternalForce_Curve.cpp.obj",
+			"KawaiiPhysicsExternalForce_Gravity.cpp.obj",
+			"KawaiiPhysicsExternalForce_Wind.cpp.obj",
+			"KawaiiPhysics.cpp.obj",
+			"KawaiiPhysicsBoneConstraintsDataAsset.cpp.obj",
+			"KawaiiPhysicsCustomExternalForce.cpp.obj",
+			"KawaiiPhysicsDeveloperSettings.cpp.obj",
+			"KawaiiPhysicsLibrary.cpp.obj",
+			"KawaiiPhysicsLimitsDataAsset.cpp.obj",
+			"KawaiiPhysicsSharedCollisionSubsystem.cpp.obj",
+			"KawaiiPhysicsSyncBone.cpp.obj",
+			"KawaiiPhysicsCollisionTest.cpp.obj",
+			"KawaiiPhysicsSharedCollisionSlotTest.cpp.obj",
+			"KawaiiPhysicsSimulationTest.cpp.obj"
+		]
+	}
+}

@@ -1,0 +1,518 @@
+{
+  "_readme": [
+    "头发 / 裙摆物理 —— KawaiiPhysics 的唯一配置来源。",
+    "ue/scripts/build_retarget_assets.py 把它传给 KorinsnaEditorLibrary.create_retarget_anim_blueprint，",
+    "C++ 侧按这个文件在 ABP 里建节点并连线：RetargetPoseFromMesh -> KawaiiPhysics(每条链一个) -> Output Pose。",
+    "",
+    "为什么一条链一个节点：KawaiiPhysics 的一个节点只有一个 RootBone（并连带它下面的所有子骨），",
+    "所以「一条骨骼链 = 一个节点」。见 docs/Physic_check.md。",
+    "",
+    "与游戏世界隔离（本 mod 的硬要求，默认值即满足）：",
+    "  enable_wind = false           不读 WindDirectionalSource，风不会把裙子吹飞",
+    "  allow_world_collision = false 只与节点内的 sphere 碰撞，而这些球都绑在自己的骨头上",
+    "  ignore_self_component = true  即使以后开启世界碰撞，也不会撞到自己的 PhysicsAsset",
+    "  simulation_space = ComponentSpace  全程组件空间结算，传送 / 世界坐标突变都不影响",
+    "  world_damping_location / world_damping_rotation  抑制「整体位移」被当成加速度",
+    "  teleport_distance_threshold   单帧位移超过它就忽略这一帧（传送保护）",
+    "",
+    "limits 里的球全部用 SphericalLimit（不用 capsule）：球的定位只需要「沿驱动骨局部 X 轴的偏移」，",
+    "而 UE 里一根骨的局部 X 轴永远指向它的子骨，所以偏移是确定的；capsule 还要额外指定朝向，",
+    "在不同引擎/骨架上容易转错 90 度。半径/偏移都是 cm，偏移 0 = 骨头原点。",
+    "",
+    "偏移是从 Blender rest pose 量出来的：大腿根到膝盖 39.7cm、膝盖到脚踝 42.4cm，",
+    "整条腿的骨链是共线的（相邻骨方向点积 0.97~1.0），所以「沿局部 X 偏移」能落到腿里。"
+  ],
+  "enabled": true,
+  "defaults": {
+    "damping": 0.12,
+    "stiffness": 0.06,
+    "world_damping_location": 0.85,
+    "world_damping_rotation": 0.85,
+    "limit_angle": 60.0,
+    "radius": 2.0,
+    "dummy_bone_length": 0.0,
+    "target_framerate": 60,
+    "simulation_space": "BaseBoneSpace",
+    "enable_wind": false,
+    "allow_world_collision": false,
+    "ignore_self_component": true,
+    "update_settings_in_game": true,
+    "reset_when_bone_missing": false,
+    "teleport_distance_threshold": 15.0,
+    "teleport_rotation_threshold": 12.0,
+    "alpha": 1.0
+  },
+  "limits": {
+    "hips": {
+      "bone": "Bip001-Pelvis",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "radius": 11.0
+    },
+    "hips_back": {
+      "bone": "Bip001-Pelvis",
+      "offset": [
+        4,
+        0,
+        0
+      ],
+      "radius": 9.0
+    },
+    "waist": {
+      "bone": "Bip001-Spine1",
+      "offset": [
+        4,
+        0,
+        0
+      ],
+      "radius": 12.0
+    },
+    "chest": {
+      "bone": "Bip001-Spine1",
+      "offset": [
+        10,
+        0,
+        0
+      ],
+      "radius": 11.0
+    },
+    "neck": {
+      "bone": "Bip001-Neck",
+      "offset": [
+        1,
+        0,
+        0
+      ],
+      "radius": 6.0
+    },
+    "head_low": {
+      "bone": "head_Bone001",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "radius": 7.0
+    },
+    "head_mid": {
+      "bone": "head_Bone002",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "radius": 6.5
+    },
+    "head_top": {
+      "bone": "head_Bone003",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "radius": 6.0
+    },
+    "shoulder_l": {
+      "bone": "Bip001-L-Clavicle",
+      "offset": [
+        5,
+        0,
+        0
+      ],
+      "radius": 8.0
+    },
+    "shoulder_r": {
+      "bone": "Bip001-R-Clavicle",
+      "offset": [
+        5,
+        0,
+        0
+      ],
+      "radius": 8.0
+    },
+    "thigh_l_a": {
+      "bone": "Bip001-L-Thigh",
+      "point": [
+        "Bip001-L-Thigh",
+        "Bip001-L-Calf",
+        0.1
+      ],
+      "radius": 9.5
+    },
+    "thigh_l_b": {
+      "bone": "Bip001-L-Thigh",
+      "point": [
+        "Bip001-L-Thigh",
+        "Bip001-L-Calf",
+        0.3
+      ],
+      "radius": 9.5
+    },
+    "thigh_l_c": {
+      "bone": "Bip001-L-Thigh",
+      "point": [
+        "Bip001-L-Thigh",
+        "Bip001-L-Calf",
+        0.5
+      ],
+      "radius": 9.5
+    },
+    "thigh_l_d": {
+      "bone": "Bip001-L-Thigh",
+      "point": [
+        "Bip001-L-Thigh",
+        "Bip001-L-Calf",
+        0.7
+      ],
+      "radius": 9.5
+    },
+    "thigh_l_e": {
+      "bone": "Bip001-L-Thigh",
+      "point": [
+        "Bip001-L-Thigh",
+        "Bip001-L-Calf",
+        0.9
+      ],
+      "radius": 9.5
+    },
+    "thigh_r_a": {
+      "bone": "Bip001-R-Thigh",
+      "point": [
+        "Bip001-R-Thigh",
+        "Bip001-R-Calf",
+        0.1
+      ],
+      "radius": 9.5
+    },
+    "thigh_r_b": {
+      "bone": "Bip001-R-Thigh",
+      "point": [
+        "Bip001-R-Thigh",
+        "Bip001-R-Calf",
+        0.3
+      ],
+      "radius": 9.5
+    },
+    "thigh_r_c": {
+      "bone": "Bip001-R-Thigh",
+      "point": [
+        "Bip001-R-Thigh",
+        "Bip001-R-Calf",
+        0.5
+      ],
+      "radius": 9.5
+    },
+    "thigh_r_d": {
+      "bone": "Bip001-R-Thigh",
+      "point": [
+        "Bip001-R-Thigh",
+        "Bip001-R-Calf",
+        0.7
+      ],
+      "radius": 9.5
+    },
+    "thigh_r_e": {
+      "bone": "Bip001-R-Thigh",
+      "point": [
+        "Bip001-R-Thigh",
+        "Bip001-R-Calf",
+        0.9
+      ],
+      "radius": 9.5
+    },
+    "calf_l_a": {
+      "bone": "Bip001-L-Calf",
+      "point": [
+        "Bip001-L-Calf",
+        "Bip001-L-Foot",
+        0.2
+      ],
+      "radius": 10.0
+    },
+    "calf_l_b": {
+      "bone": "Bip001-L-Calf",
+      "point": [
+        "Bip001-L-Calf",
+        "Bip001-L-Foot",
+        0.5
+      ],
+      "radius": 9.5
+    },
+    "calf_l_c": {
+      "bone": "Bip001-L-Calf",
+      "point": [
+        "Bip001-L-Calf",
+        "Bip001-L-Foot",
+        0.85
+      ],
+      "radius": 9.0
+    },
+    "calf_r_a": {
+      "bone": "Bip001-R-Calf",
+      "point": [
+        "Bip001-R-Calf",
+        "Bip001-R-Foot",
+        0.2
+      ],
+      "radius": 10.0
+    },
+    "calf_r_b": {
+      "bone": "Bip001-R-Calf",
+      "point": [
+        "Bip001-R-Calf",
+        "Bip001-R-Foot",
+        0.5
+      ],
+      "radius": 9.5
+    },
+    "calf_r_c": {
+      "bone": "Bip001-R-Calf",
+      "point": [
+        "Bip001-R-Calf",
+        "Bip001-R-Foot",
+        0.85
+      ],
+      "radius": 9.0
+    },
+    "lowerarm_l_a": {
+      "bone": "Bip001-L-Forearm",
+      "point": [
+        "Bip001-L-Forearm",
+        "Bip001-L-Hand",
+        0.3
+      ],
+      "radius": 5.0
+    },
+    "lowerarm_l_b": {
+      "bone": "Bip001-L-Forearm",
+      "point": [
+        "Bip001-L-Forearm",
+        "Bip001-L-Hand",
+        0.75
+      ],
+      "radius": 4.5
+    },
+    "lowerarm_r_a": {
+      "bone": "Bip001-R-Forearm",
+      "point": [
+        "Bip001-R-Forearm",
+        "Bip001-R-Hand",
+        0.3
+      ],
+      "radius": 5.0
+    },
+    "lowerarm_r_b": {
+      "bone": "Bip001-R-Forearm",
+      "point": [
+        "Bip001-R-Forearm",
+        "Bip001-R-Hand",
+        0.75
+      ],
+      "radius": 4.5
+    },
+    "hand_l": {
+      "bone": "Bip001-L-Hand",
+      "offset": [
+        2,
+        0,
+        0
+      ],
+      "radius": 5.5
+    },
+    "hand_r": {
+      "bone": "Bip001-R-Hand",
+      "offset": [
+        2,
+        0,
+        0
+      ],
+      "radius": 5.5
+    }
+  },
+  "profiles": {
+    "skirt": {
+      "note": "裙摆：只与自己的臀 / 大腿 / 小腿 / 前臂 / 手碰撞；刚度略高才有垂坠感。",
+      "spheres": [
+        "hips",
+        "hips_back",
+        "thigh_l_a",
+        "thigh_l_b",
+        "thigh_l_c",
+        "thigh_l_d",
+        "thigh_l_e",
+        "thigh_r_a",
+        "thigh_r_b",
+        "thigh_r_c",
+        "thigh_r_d",
+        "thigh_r_e",
+        "calf_l_a",
+        "calf_l_b",
+        "calf_l_c",
+        "calf_r_a",
+        "calf_r_b",
+        "calf_r_c"
+      ],
+      "settings": {
+        "radius": 2.5,
+        "world_damping_location": 1.0,
+        "world_damping_rotation": 1.0,
+        "planar_constraint": "none",
+        "damping": 0.55,
+        "stiffness": 0.3,
+        "limit_angle": 0.0
+      },
+      "capsules": []
+    },
+    "hair_long": {
+      "note": "长头发（后发 / 前发，5 骨）：防穿头、防穿肩背。",
+      "spheres": [
+        "head_low",
+        "head_mid",
+        "head_top",
+        "neck",
+        "chest"
+      ],
+      "settings": {
+        "radius": 0.6,
+        "world_damping_location": 1.0,
+        "world_damping_rotation": 1.0,
+        "planar_constraint": "none",
+        "damping": 0.6,
+        "stiffness": 0.3,
+        "limit_angle": 50.0
+      },
+      "capsules": []
+    },
+    "hair_short": {
+      "note": "刘海 / 发饰（短链）：只防穿头，硬一点、幅度小一点，避免抖动。",
+      "spheres": [
+        "head_low",
+        "head_mid",
+        "head_top",
+        "neck",
+        "chest"
+      ],
+      "settings": {
+        "radius": 0.6,
+        "world_damping_location": 1.0,
+        "world_damping_rotation": 1.0,
+        "planar_constraint": "none",
+        "damping": 0.6,
+        "stiffness": 0.3,
+        "limit_angle": 50.0
+      },
+      "capsules": []
+    }
+  },
+  "chains": [
+    {
+      "root": "Bip001-Pelvis",
+      "profile": "skirt",
+      "exclude": [
+        "Bip001-Spine",
+        "Bip001-L-Thigh",
+        "Bip001-R-Thigh"
+      ],
+      "note": "全部 8 条裙摆链。根骨必须是裙摆第 1 根骨的公共父骨（骨盆）：Kawaii 把节点根骨当运动学骨、只跟随动画姿态，根骨若设成 *_skirt_1，那根骨永远不会被物理推动，裙子只能从第 2 根骨被掀起。骨盆本身保持动画姿态，脊柱与双腿的子树靠 exclude 剪掉。"
+    },
+    {
+      "root": "head_Bone003",
+      "profile": "hair_long",
+      "exclude": [
+        "l_erduo_1",
+        "r_erduo_1",
+        "l_toushi_1",
+        "l_toushi_4",
+        "l_toushi_7",
+        "l_toushi_21",
+        "r_toushi_1",
+        "r_toushi_4",
+        "r_toushi_7",
+        "r_toushi_21",
+        "liuhai_1",
+        "liuhai_11"
+      ],
+      "note": "后发 A + 前发（长链）。头骨作为运动学根骨，耳环 / 发饰 / 刘海留给短发节点。"
+    },
+    {
+      "root": "head_Bone003",
+      "profile": "hair_short",
+      "exclude": [
+        "l_erduo_1",
+        "r_erduo_1",
+        "l_houfaA_1",
+        "r_houfaA_1",
+        "qianfa_1",
+        "qianfa_8",
+        "qianfa_15",
+        "qianfa_22",
+        "qianfa_31",
+        "qianfa_39"
+      ],
+      "note": "刘海 + 左右发饰（短链）。"
+    },
+    {
+      "root": "head_Bone002",
+      "profile": "hair_long",
+      "exclude": [
+        "b_toushi_1"
+      ],
+      "note": "后发 B（长链）。head_Bone002 与 head_Bone003 是兄弟骨，各自单独一个节点。"
+    },
+    {
+      "root": "head_Bone002",
+      "profile": "hair_short",
+      "exclude": [
+        "l_houfaB_1",
+        "r_houfaB_1"
+      ],
+      "note": "后发饰（短链）。"
+    }
+  ],
+  "capsules": {
+    "_readme": "???????????Kawaii ????????? Z ????????????????????????????????????????C++ ??????+???",
+    "hips": {
+      "bone": "Bip001-Pelvis",
+      "from": [
+        "Bip001-Pelvis",
+        "Bip001-Spine1"
+      ],
+      "radius": 11.0
+    },
+    "thigh_l": {
+      "bone": "Bip001-L-Thigh",
+      "from": [
+        "Bip001-L-Thigh",
+        "Bip001-L-Calf"
+      ],
+      "radius": 9.5
+    },
+    "thigh_r": {
+      "bone": "Bip001-R-Thigh",
+      "from": [
+        "Bip001-R-Thigh",
+        "Bip001-R-Calf"
+      ],
+      "radius": 9.5
+    },
+    "calf_l": {
+      "bone": "Bip001-L-Calf",
+      "from": [
+        "Bip001-L-Calf",
+        "Bip001-L-Foot"
+      ],
+      "radius": 7.5
+    },
+    "calf_r": {
+      "bone": "Bip001-R-Calf",
+      "from": [
+        "Bip001-R-Calf",
+        "Bip001-R-Foot"
+      ],
+      "radius": 7.5
+    }
+  }
+}

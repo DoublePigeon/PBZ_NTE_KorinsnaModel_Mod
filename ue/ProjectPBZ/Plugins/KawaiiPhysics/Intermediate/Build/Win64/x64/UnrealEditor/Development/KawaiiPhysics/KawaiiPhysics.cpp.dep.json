@@ -1,0 +1,14 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\source\\kawaiiphysics\\private\\kawaiiphysics.cpp",
+        "ProvidedModule": "",
+        "PCH": "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\intermediate\\build\\win64\\x64\\projectpbzeditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\kawaiiphysics\\definitions.kawaiiphysics.h",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\source\\kawaiiphysics\\public\\kawaiiphysics.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

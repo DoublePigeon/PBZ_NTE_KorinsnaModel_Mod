@@ -1,0 +1,15 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UnrealEditor-KawaiiPhysicsEd.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"J:/VS_Projects/PBZ_KorinsnaSkinMod/ue/ProjectPBZ/Intermediate/Build/Win64/x64/ProjectPBZEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"J:/VS_Projects/PBZ_KorinsnaSkinMod/ue/ProjectPBZ/Plugins/KawaiiPhysics/Intermediate/Build/Win64/x64/UnrealEditor/Development/KawaiiPhysicsEd/Module.KawaiiPhysicsEd.cpp.obj"
+"J:/VS_Projects/PBZ_KorinsnaSkinMod/ue/ProjectPBZ/Plugins/KawaiiPhysics/Intermediate/Build/Win64/x64/UnrealEditor/Development/KawaiiPhysicsEd/AnimGraphNode_KawaiiPhysics.cpp.obj"
+"J:/VS_Projects/PBZ_KorinsnaSkinMod/ue/ProjectPBZ/Plugins/KawaiiPhysics/Intermediate/Build/Win64/x64/UnrealEditor/Development/KawaiiPhysicsEd/KawaiiPhysicsEd.cpp.obj"
+"J:/VS_Projects/PBZ_KorinsnaSkinMod/ue/ProjectPBZ/Plugins/KawaiiPhysics/Intermediate/Build/Win64/x64/UnrealEditor/Development/KawaiiPhysicsEd/KawaiiPhysicsEditMode.cpp.obj"
+"J:/VS_Projects/PBZ_KorinsnaSkinMod/ue/ProjectPBZ/Plugins/KawaiiPhysics/Intermediate/Build/Win64/x64/UnrealEditor/Development/KawaiiPhysicsEd/Default.rc2.res"
+/OUT:"J:/VS_Projects/PBZ_KorinsnaSkinMod/ue/ProjectPBZ/Plugins/KawaiiPhysics/Intermediate/Build/Win64/x64/UnrealEditor/Development/KawaiiPhysicsEd/UnrealEditor-KawaiiPhysicsEd.lib"

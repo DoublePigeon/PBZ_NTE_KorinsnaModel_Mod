@@ -1,0 +1,21 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\source\\kawaiiphysics\\private\\kawaiiphysicsboneconstraintsdataasset.cpp",
+        "ProvidedModule": "",
+        "PCH": "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\intermediate\\build\\win64\\x64\\projectpbzeditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\kawaiiphysics\\definitions.kawaiiphysics.h",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\source\\kawaiiphysics\\public\\kawaiiphysicsboneconstraintsdataasset.h",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\source\\kawaiiphysics\\public\\kawaiiphysicsboneconstrainttypes.h",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\unrealeditor\\inc\\kawaiiphysics\\uht\\kawaiiphysicsboneconstrainttypes.generated.h",
+            "k:\\unrealengine\\ue_5.7\\engine\\source\\runtime\\engine\\classes\\interfaces\\interface_bonereferenceskeletonprovider.h",
+            "k:\\unrealengine\\ue_5.7\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\interface_bonereferenceskeletonprovider.generated.h",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\unrealeditor\\inc\\kawaiiphysics\\uht\\kawaiiphysicsboneconstraintsdataasset.generated.h",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\source\\kawaiiphysics\\public\\kawaiiphysics.h",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\unrealeditor\\inc\\kawaiiphysics\\uht\\kawaiiphysicsboneconstraintsdataasset.gen.cpp"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

@@ -1075,17 +1075,218 @@ ground: pelvis src -1240.1 ours -1189.4 (+50.7) | foot src -1282.7 ours -1219.9 
 | --- | --- | --- |
 | 手指动画 | 已做：A-pose 绑定姿态 + 逐关节切段（§5.4），指节干净 | 若某些手势出现指节穿插，改 `ue/retarget_config.json` 里对应那一节的旋转权重/关闭该节 |
 | 头部 | 只用 Neck 链跟随，脸不参与 | 给 `head_Bone001/002` 单独建链 + 逐骨偏移 |
-| 裙摆 | 刚体（不参与重定向） | 换成 Chaos Cloth，或用正确的骨骼映射重新做链 |
+| 裙摆 | 已做：KawaiiPhysics 物理（§11），球体碰撞 + 不限角 | 穿模（蹲下最明显）来自「5 段骨 + 网格体积」，要更贴合需在 ABP 里做骨骼细分（本 fork 未验证） |
 | 扭转骨轴向限制 | 切段后每段刚性复制同一关节（§5.6），没有「只绕骨轴」的限制 | 若仍出现糖果纸扭曲，在 ABP 里加约束节点 |
 | 衣服质感 | 中性 ARM：全粗糙、非金属 | 想要一点高光时把 `_ARM` 的 G 改成 180（参考 2B mod 的值） |
 | 皮肤颜色 | 可琳思娜的腿/手本来就接近白色，槽 1 借的 `Cloth_02_b` 会再混一点布料噪点 | 想更干净时把槽 1 也换成纯底色实例（要同时换它唯一的 albedo 贴图路径） |
 | 游戏换材质 | 只守住槽 0（受伤头材质），玩家与过场副本都守（§6.18 / §6.21） | 若别的槽也被换掉，往 `material_guard` 里加条目 |
 | 跨扫描缓存 | 只存对象名，用前 `StaticFindObject` 重新解析（§6.22） | 若有新的缓存需求，沿用这个模式，不要保存 UObject 引用 |
-| 运行期开销 | 每轮一次全关卡搜索（原为三次）、release 不写日志（§6.25） | 任何「把搜索换成遍历组件树」的优化都要先确认产出数量不是 0（`GetRootComponent` 在本 build 不可用，§6.25.1） |
+| 运行期开销 | 事件驱动缓存（§12）：监听回调只入队，全关卡扫描只剩换图/接管各一次 + 10s 一次的武器兜底 + 布料两类 | 若还有周期性卡顿，用 dev 的 `profile:` 行区分「脚本慢」和「引擎卡」 |
 | 姿势恢复 | 直接读 `LeaderPoseComponent`，下一轮即恢复（§6.17） | 若某天该属性读不到，`pose_bone_fallback` 仍会兜底（慢 ~2 秒） |
-| 武器握点 | 手骨距离按左手/右手各一个常数 | 按武器类型细分（斧/刀/钩的握点不同） |
+| 武器握点 | 单手/双持按手骨距离常数吸附；`*_child` 挂点的御剑完全交给游戏（§13.1） | 双手武器（斩马刀）左手不在杆上，原因已查明（§13.2），修法方向也写明 |
 | 收起的武器 | 挂到 `Bip001-Spine` + 沿背面外推 2cm（§5.8.1） | 若某类大武器在背上穿模，可按武器类型给不同的锚骨/外推 |
 | 姿势丢失 | 看门狗 2 秒内重建（§6.17） | 若能找到游戏重设 leader pose 的那个调用点，可在源头阻止而不是事后重建 |
 | 过场副本 | 运行时隐藏副本身上除我们网格与武器外的一切（§6.19） | 更彻底的做法是在资产层把 `Hun_Body_Simple` 也替换成空白网格（会丢失重定向源，需另找姿势来源） |
-| 披风/长发物理 | 已清空（外观隐藏的代价） | 若要恢复，需要在 Korinsna 自己骨架上重建布料资产 |
+| 披风/长发物理 | 头发已做 KawaiiPhysics（4 条链，§11）；披风仍未处理 | 披风若也要物理，按 §11.1 加一条 chain 即可，但要先确认它挂在哪根骨下 |
 | 阴影 | 承载网格不投影（避免黑斑） | 修好 retargeted mesh 的深度 pass 后可以打开 |
+
+## 11. 头发与裙摆物理（KawaiiPhysics，本轮）
+
+### 11.1 管线
+
+| 环节 | 位置 |
+| --- | --- |
+| 唯一数据源 | `ue/kawaii_config.json`（`chains` / `profiles` / `limits`） |
+| 烘焙者 | `ue/ProjectPBZ/Source/ProjectPBZ/KorinsnaEditorLibrary.cpp` → `ConfigureKawaiiNode()` |
+| 触发 | `ue/scripts/build_retarget_assets.py`（构建 ABP 时按配置写节点） |
+| 产物 | `ABP_Korinsna_Retarget` 里 5 个 Kawaii 节点（1 条裙摆链 + 4 条头发链），谱系 `Retarget → Kawaii… → Root` |
+| 校验 | 构建日志里的 `kawaii[i] root=… spheres=… exclude=… capsules=… alpha=…` |
+
+改参数只需要改 JSON 再跑一次
+`UnrealEditor-Cmd.exe <uproject> -ExecutePythonScript=…\build_retarget_assets.py`，
+**不需要**重新导入模型，也不需要重跑 Blender。
+
+### 11.2 这个 fork 的六个硬约束（全部实测）
+
+1. **链的根骨是运动学骨**（`bSkipSimulate = true`）：它只跟着动画走，永远不被物理推动。
+   所以根骨必须选「要模拟的第一根骨的公共父骨」，再用 `ExcludeBones` 把它真正的孩子链剪出来。
+   把根骨写成 `*_skirt_1` 时，第 1 根骨永远不会动 —— 这是最早「裙子没有物理感」的根因；
+   改成 `Bip001-Pelvis` / `head_Bone002/003` + exclude 之后节点数从 29 降到 5，行为才正确。
+2. **没有速度上限字段**：速度衰减只有 `Velocity *= (1 - Damping)`。想「限制速度」只能提 Damping。
+3. **`Stiffness` 是往动画姿态拉的比例**（`Location += (pose - Location) * (1-(1-Stiffness)^Exponent)`）：
+   - 太高（0.96）→ 布料被「焊」在贴腿的动画姿态上 → 碰撞顶开后立刻拉回 → **必然穿模**
+   - 太低（0.05）→ 移动时形状塌掉，裙子/头发会并成一片又窄又薄的片
+   - 最终取 **0.30**
+4. **碰撞判定是 `距离 < 球半径 + 骨骼半径`**，所以 `profiles.*.settings.radius` 是一个免费的「间隙余量」，
+   比放大球更安全（放大球会让左右大腿的球在中心线重叠）。
+5. **球体在游戏里有效，胶囊在游戏里无效**（见 11.4）。
+6. **`WorldDampingLocation/Rotation` 默认 0.8**，设成 1.0 是极值。
+
+### 11.3 最终参数
+
+| profile | damping | stiffness | limit_angle | radius | 碰撞体 |
+| --- | --- | --- | --- | --- | --- |
+| `skirt` | 0.55 | 0.30 | 0（不限角） | 2.5 | 18 个球：臀 2 + 大腿 5×2 + 小腿 3×2 |
+| `hair_long` / `hair_short` | 0.60 | 0.30 | 50° | 0.6 | 5 个球：`head_low/mid/top` + `neck` + `chest` |
+
+`world_damping_location = world_damping_rotation = 1.0`，`planar_constraint = none`。
+
+- **裙摆不限角**：一旦有角限，被碰撞顶开的位移会被硬拉回，穿模变成常态。
+- **头发限 50°**：头发质量轻，不限角会甩到脸上；50° 足够摆动但不会翻起来。
+- **裙摆 `radius = 2.5`**：`Stiffness 0.3` 每帧把裙子往贴腿的姿态拉 30%，稳定后裙子会停在腿里；
+  加 1.9cm 的骨骼半径余量把平衡点推到网格外面，且不改变球布局。
+- **大腿球半径 9.5 不能加到 10.5**：球心在 `x = ±9.6`，半径 10.5 时左右球在中心线**重叠**，
+  正前方的裙片同时落在两个球里，每帧被互相弹开 → 裙子塌陷 + 抽动。
+- **头发必须有碰撞体**：没有时头发会穿进头/颈/胸。
+
+### 11.4 胶囊体在游戏里不生效（重要）
+
+`CapsuleLimits` 的数据能被烘焙、也能被游戏加载，但**游戏里不产生碰撞**：
+
+- 运行时回读（dev 版 `report_physics_nodes`）确认：`capsules=5`，
+  驱动骨 `Bip001-L-Thigh / R-Thigh / L-Calf / R-Calf / Bip001-Pelvis` 全部绑定成功，
+  `len = 39.70 / 42.43`、`r = 9.5 / 7.5 / 11.0`，实时胶囊中心 `at=(9.6, 0.6, 74.9)` 等与理论完全一致。
+- 编辑器预览里同样的胶囊能顶住裙子，**游戏里完全不顶**。
+- 结论：这个旧 fork 的胶囊求解在运行时没被调用。用「沿腿加密的球」代替胶囊。
+
+### 11.5 已否决的两条路线
+
+| 路线 | 否决依据 |
+| --- | --- |
+| 用自带新版 KawaiiPhysics 覆盖游戏旧版（`docs/Kawaii_Check.md` 的方案） | 游戏是 **monolithic 构建**：`PBZ.exe` 导入表只有 56 个系统 DLL、导出表只有 523 个 Wwise/AntiLag 符号，游戏目录没有 `Core.dll/Engine.dll/AnimGraphRuntime.dll`；我们自己的 Game target 也把插件模块静态链接进 exe（无 DLL 产出）。UE4SS 是注入 hook，不能加载 UE 插件模块。 |
+| RigidBody + PhysicsAsset（`docs/Rigidbody.md`） | 手写 `FConstraintInstance` 缺 `Pos1/PriAxis1/Pos2…` → 231 个模拟体自由下落。改用 `FPhysicsAssetUtils::CreateFromSkeletalMesh` 生成后才正常（369 体/368 约束/`ComponentSpace`/重力 −980），但实测裙摆穿模、头发乱飘、抽动依旧，且没有 Kawaii 的「按姿态回弹」手感。配置保留在 `ue/rigidbody_config.json`，`build_retarget_assets.py` 的 `PHYSICS_CONFIG` 可切回。 |
+
+### 11.6 调参/排障手段（仅 dev）
+
+| 手段 | 用法 |
+| --- | --- |
+| `F1`–`F6` | 阻尼/刚度阶梯（含「物理关闭」），用于二分定位 |
+| `F7`–`F9` | `PlanarConstraint` X/Y/Z |
+| `F10` | 逐帧采样（游戏线程），记录裙摆/头发骨骼与碰撞体的实时位置 |
+| `report_physics_nodes` | 一次性回读节点参数、球/胶囊数量与绑定情况 |
+| `profile: scan took …` | 脚本自身耗时 |
+
+## 12. 运行期性能：把「定期全关卡扫描」换成事件驱动缓存
+
+### 12.1 先量化，再动手
+
+`NotifyOnNewObject` 的类普查（dev 版 `report_listener_classes`）实测，约 2 分钟正常游玩：
+
+| 类 | 次数 |
+| --- | --- |
+| `StaticMeshComponent` | 3656 |
+| `SplineMeshComponent`（子类） | 1346 |
+| `InstancedStaticMeshComponent`（子类） | 380 |
+| `SkeletalMeshComponentBudgeted`（子类） | 129 |
+| `SkeletalMeshComponent` | 89 |
+| **`ChaosClothComponent`** | **0**（当时场景里确实有 4 个布料构件） |
+| **`GroomComponent`** | **0** |
+
+结论三条：
+
+1. `NotifyOnNewObject` **按 `IsA` 匹配子类**（三种子类都被通知到），所以副本的骨骼/静态网格组件可以靠它抓。
+2. **Chaos 布料与 Groom 收不到通知** —— 只靠监听器会直接让「过场里原主角衣服又出现」回归，
+   这两类必须单独保留一次「全关卡 + 只查这两个稀有类」的扫描。
+3. 通知时 `owner` 读不到的比例约 3%，所以「生成瞬间分类」不可靠，需要延迟复核。
+
+旧实现每条通知要 2 次 `ExecuteInGameThread` 跳转（2 分钟 ≈ 11200 个 game-thread 任务）。
+
+### 12.2 现在的结构
+
+| 环节 | 做法 |
+| --- | --- |
+| 监听回调 | 只做 `spawn_queue[tail++] = obj`（零引擎调用、零跳转） |
+| 分类 | `scan()` 里批量消费：正常 300/次；**英雄尚未接管时 4000/次**（关卡加载时队列一次涌入约 4400 个，接管不能被道具堵住） |
+| 延迟列表 | `owner == nil` 的进 `undecided_copies`，每次 scan 重判 32 个 |
+| 副本/布料缓存 | 判中即 `add_copy_entry()` 增量入表，`copy_index` / `cloth_index` 去重（重复通知天然幂等） |
+| 防名字复用 | 缓存 entry 记下 `owner`，`apply_copy_hiding` 每次复解析后**再比对 owner** |
+| 死引用 | 直接从表里摘除并释放名字（不再置 `copy_dirty` 触发重扫） |
+| 全关卡扫描 | 只剩：① 换图 / 英雄接管各一次（`collect_copy_components`）；② 布料/Groom 两类稀有类（`collect_hero_garments`）；③ `refresh_targets` 每 20 tick（武器/刀鞘/背挂，新增生成时分类） |
+| 英雄部件阴影 | `hero_part_components()` 直接读 `state.hidden_list`（那张表本来就是英雄本人的部件集合），完全不走搜索 |
+
+### 12.3 被删掉的周期性开销
+
+| 原开销 | 处理 |
+| --- | --- |
+| 每 60 tick（30s）一次全关卡 `FindAllOf("SkeletalMeshComponent")`（`discover_hero` 的兜底巡视） | 英雄已接管且身体存活时**直接跳过**；只剩「从没见过英雄 / 英雄丢了」才扫 |
+| 每 20 tick（10s）一次全关卡扫描（`hero_part_components`） | 改用隐藏列表 |
+| 每 0.5s 一次全关卡扫描（`refresh_targets`，release 也是） | 生成时用 `classify_target()` 分类；周期兜底放宽到 20 tick |
+| 每 scan 一次全关卡扫描（`watch_weapon_chain`，dev 独有） | 默认关闭，只在查武器挂点时打开 |
+| 5 类 × 全关卡（`collect_copy_components`）+ 2 趟（`collect_hero_garments`） | 见 12.2 |
+
+### 12.4 剩下的可接受开销
+
+- 每 0.5s：`drive_carrier`（清 leader pose）、`watch_pose`（姿态看门狗）、`guard_materials`、按缓存表 re-hide
+- 每 1s：`quiet_blank_parts`（遍历隐藏列表，关阴影/主 pass）
+- 每 10s：`refresh_targets`（一次全关卡，兜底）
+- 换图 / 接管：各一次副本全扫
+- 布料/Groom：`copy_dirty` 时一次两类全扫
+
+### 12.5 卡顿定位工具（dev）
+
+```
+profile: scan took 23.4ms (tick 812)              ← 我们自己的脚本慢
+profile: 640ms stall before tick 813 (previous scan took 3.1ms)
+                                                  ← 引擎自己在卡（上一轮我们的耗时很正常）
+```
+
+这两行能直接区分「脚本的锅」和「引擎的锅」，不要再靠感觉猜。
+
+## 13. 武器挂点：御剑与双手武器的实测结论
+
+### 13.1 御剑（痴者残剑 / 痴者醉剑）：**保留游戏挂点**
+
+- 痴者残剑：actor `BP_Weapon_Hun_ChiZheCanJian_C`，网格 `Hun_CanJian`，游戏挂点是
+  **`weapon_r_child`**（一个可被动画驱动的骨骼，不是普通手部 socket）。
+- 实测：把它吸附到 `Bip001-R-Hand` 后，整场它的 root 一直离手 15–43cm，**再也不会飞出去**。
+- 只做握把修正也不行：游戏**每帧重写**它的相对变换（飞行动画就是这样做的），
+  我们写的位置下一帧就被覆盖 → 手上位置照样偏。
+- 因此：**挂点是 `*_child` 的武器完全不碰**，交给游戏。代价是它在手上时比理想位置偏上 3~4cm
+  （它挂在 Hun 更大一号的手上）。这是**刻意取舍**：飞行是玩法，偏移是外观。
+- 实现：`anchor_held_weapons()` 里 `driver_mount` 分支（socket 名含 `_child`）。
+- 注意：我们的骨架是 `Bip001-*`，**没有** `weapon_r_child` 这根骨，不能把武器改挂到自己的同名骨上。
+
+### 13.2 双手武器（斩马刀）：**未修，已查明原因**
+
+- 武器网格上**没有**第二握点 socket。`Hun_WangMingZhanMaDao` 的全部 socket：
+  `TrailStart, BladeBloodStart, Sound_Weapon, BlueEyeSocket, HoldDeflect, Deflect_Middle,
+  RootNode, WangMingZhanMaDao_Root, WangMingZhanMaDao`。
+- 双手握是 Hun 自己的 ABP 里用**左手 IK** 实现的，不是靠挂点。
+- 实测（手到武器长轴的侧向距离）：
+
+  | 采样 | 右手 lateral | 左手 lateral | 左手 along |
+  | --- | --- | --- | --- |
+  | Hun 原姿势（双手握） | 15.3cm | **8.2cm** | −66.3cm |
+  | 搬到可琳思娜手上后 | 2.7cm | **6.5~19.8cm** | −54.4cm |
+
+  （对照：单手刀 `Hun_MaleThug_Elite_Blade` 的 Hun 左手 lateral 为 47cm，所以这个判据能区分单手/双手姿势。）
+- 试过两条路，都**已回退**：
+  1. 绕握把把刀杆轴转到穿过左手 → 因为刀杆轴原方向与「握把→左手」相反，最小角度解之前那次直接**把武器转反了**；
+  2. 用「手骨方向 × 握距」做确定性握把放置 → 反向导致**单手剑位置错乱、御剑只留在手上**。
+- 后续若要修，正确的方向是「只在判定为双手姿势时、且只对右手挂点的武器，做一次最小旋转」，
+  并且**必须在最小角度解上做符号判定**（比较与当前朝向的点积），回退验证要覆盖单手剑与御剑。
+
+### 13.3 通用坑
+
+- `GetAllSocketNames()` 返回 `TArray<FName>`，元素是 `RemoteUnrealParam`，
+  必须 `raw:get():ToString()`；直接 `tostring(raw)` 得到的是 `RemoteUnrealParam: 0x…` 或
+  `FNameUserdata: 0x…`。
+- 判定「现在是不是拿在手里」不能只看距离：御剑的失败案例里，武器一直在离手 15–43cm 的范围内。
+- 武器的 pivot 通常就是手感锚点，但痴者残剑这种**相对变换被游戏逐帧改写**的武器，
+  用「世界空间偏移」做的任何修正都会被覆盖。
+
+## 14. 本轮新增常见问题
+
+| 现象 | 原因 / 处理 |
+| --- | --- |
+| 改了 `kawaii_config.json` 没变化 | 只改 JSON 不会生效，要重跑 `build_retarget_assets.py` 再 cook（`tools\build_all.ps1`） |
+| 裙子被顶成气球、走路像有隐形圆环 | 球半径或 `settings.radius` 给太大；先降半径，再考虑加球 |
+| 移动时裙子/头发并成一片又窄又薄的片 | `stiffness` 太低导致形状维持不住；0.30 是本项目取到的平衡点 |
+| 静止就穿模、越站越陷 | `stiffness` 偏高把布料从碰撞结果里拉回；降刚度或加 `settings.radius` 余量 |
+| 裙子抽搐 | ① 物理没被完全移除（先用 `F6`/`enabled:false` 二分）② damping 太低 ③ 左右大腿球在中心线重叠 |
+| 头发穿脸/穿胸 | 头发 profile 没有碰撞球；加 `head_low/mid/top + neck + chest` |
+| 御剑不飞了 | 有人把它吸附到手骨上了；见 §13.1，`*_child` 挂点必须留给游戏 |
+| 过场里原主角衣服又出现 | 检查 `cloth:` 日志：Chaos 布料/Groom 收不到生成通知，必须靠 `collect_hero_garments` 的两类扫描 |
+| 过场后 A-pose | 游戏重新 `SetLeaderPoseComponent`；`drive_carrier` 每 0.5s 兜一次，`watch_pose` 负责检测 |
+| Lua 改完没生效 | UE4SS 只在**启动时**加载脚本；装错 profile（`install_lua.ps1 -Profile dev/release`）也不会生效 |
+| release 版日志是空的 | 设计如此：release 只在出问题时写日志（`log_level = 1`） |

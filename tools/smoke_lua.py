@@ -228,8 +228,10 @@ def check(profile, world):
     hero = world in ("hero", "late")
 
     # The listeners are what make the hero discovery event driven, so BOTH profiles must register them.
-    if listeners != 2:
-        problems.append("%s: expected 2 object listeners, got %s" % (label, listeners))
+    # Four: the two engine base classes plus the cloth and groom classes the census proved are not
+    # covered by them.
+    if listeners != 4:
+        problems.append("%s: expected 4 object listeners, got %s" % (label, listeners))
     if "scan error" in text:
         problems.append("%s: a scan raised: %s" % (
             label, text.split("scan error:", 1)[1].splitlines()[0]))

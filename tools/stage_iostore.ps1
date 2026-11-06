@@ -64,10 +64,27 @@ Remove-Item (Join-Path $projDir "Saved\StagedBuilds") -Recurse -Force -ErrorActi
 $stageOut = Join-Path $projDir "Saved\KorinsnaStage"
 Remove-Item $stageOut -Recurse -Force -ErrorAction SilentlyContinue
 
-& $uat BuildCookRun "-project=$Project" -noP4 -platform=Win64 -clientconfig=Development `
-    -skipbuild -skipcook -stage -pak -iostore -unattended -nopause -utf8output `
-    "-archive" "-archivedirectory=$stageOut" | Out-Host
-if ($LASTEXITCODE -ne 0) { throw "UAT staging failed" }
+# UAT's -stage step insists on copying the game executable, but this mod ships only cooked assets: the
+# exe is never packaged into the container. When the project has no Game build (it normally does not -
+# only the editor module is built), drop in a placeholder for the duration of the staging run.
+$gameExe = Join-Path $projDir "Binaries\Win64\ProjectPBZ.exe"
+$placeholderExe = $false
+if (-not (Test-Path $gameExe)) {
+    New-Item -ItemType Directory -Force -Path (Split-Path $gameExe -Parent) | Out-Null
+    Set-Content -Path $gameExe -Value "" -Encoding ASCII
+    $placeholderExe = $true
+    Write-Host "== staging: placeholder game exe created (never shipped)"
+}
+
+try {
+    & $uat BuildCookRun "-project=$Project" -noP4 -platform=Win64 -clientconfig=Development `
+        -skipbuild -skipcook -stage -pak -iostore -unattended -nopause -utf8output `
+        "-archive" "-archivedirectory=$stageOut" | Out-Host
+    if ($LASTEXITCODE -ne 0) { throw "UAT staging failed" }
+}
+finally {
+    if ($placeholderExe) { Remove-Item $gameExe -Force -ErrorAction SilentlyContinue }
+}
 
 $paks = Join-Path $stageOut "Windows\ProjectPBZ\Content\Paks"
 $utoc = Join-Path $paks "ProjectPBZ-Windows.utoc"

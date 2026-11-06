@@ -104,6 +104,12 @@ return {
         pose_weapon_wait = 2,
         -- diagnostic: print the watchdog counters every 5 scans
         report_pose_window = false,
+        -- diagnostic: dump the KawaiiPhysics anim nodes the engine built for our graph, once per body
+        -- (field names only; the game ships its own KawaiiPhysics fork, so this proves what survived
+        -- the load). See docs/TECHNICAL-GUIDE.md 搂9.
+        report_physics_nodes = false,
+        report_physics_frames = false,
+        live_physics_keys = false,
         -- diagnostic: pelvis/foot heights of the game's body vs ours (used to find the floating
         -- sit/lie bug, see §8.9). Turn on to measure, keep off: it logs a line per second.
         report_ground_every = 0,

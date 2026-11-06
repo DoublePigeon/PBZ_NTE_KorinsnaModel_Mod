@@ -1,0 +1,33 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+/*===========================================================================
+	Generated code exported from UnrealHeaderTool.
+	DO NOT modify this manually! Edit the corresponding .h files instead!
+===========================================================================*/
+
+// IWYU pragma: private, include "ExternalForces/KawaiiPhysicsExternalForce_Basic.h"
+
+#ifdef KAWAIIPHYSICS_KawaiiPhysicsExternalForce_Basic_generated_h
+#error "KawaiiPhysicsExternalForce_Basic.generated.h already included, missing '#pragma once' in KawaiiPhysicsExternalForce_Basic.h"
+#endif
+#define KAWAIIPHYSICS_KawaiiPhysicsExternalForce_Basic_generated_h
+
+#include "UObject/ObjectMacros.h"
+#include "UObject/ScriptMacros.h"
+
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+
+// ********** Begin ScriptStruct FKawaiiPhysics_ExternalForce_Basic ********************************
+struct Z_Construct_UScriptStruct_FKawaiiPhysics_ExternalForce_Basic_Statics;
+#define FID_ProjectPBZ_Plugins_KawaiiPhysics_Source_KawaiiPhysics_Public_ExternalForces_KawaiiPhysicsExternalForce_Basic_h_15_GENERATED_BODY \
+	friend struct ::Z_Construct_UScriptStruct_FKawaiiPhysics_ExternalForce_Basic_Statics; \
+	static class UScriptStruct* StaticStruct(); \
+	typedef FKawaiiPhysics_ExternalForce Super;
+
+
+struct FKawaiiPhysics_ExternalForce_Basic;
+// ********** End ScriptStruct FKawaiiPhysics_ExternalForce_Basic **********************************
+
+#undef CURRENT_FILE_ID
+#define CURRENT_FILE_ID FID_ProjectPBZ_Plugins_KawaiiPhysics_Source_KawaiiPhysics_Public_ExternalForces_KawaiiPhysicsExternalForce_Basic_h
+
+PRAGMA_ENABLE_DEPRECATION_WARNINGS

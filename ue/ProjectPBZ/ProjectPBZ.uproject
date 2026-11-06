@@ -17,6 +17,7 @@
 		{ "Name": "AkashaEffects", "Enabled": true },
 		{ "Name": "ChaosClothAsset", "Enabled": true },
 		{ "Name": "ChaosClothAssetEditor", "Enabled": true },
-		{ "Name": "ChaosCloth", "Enabled": true }
+		{ "Name": "ChaosCloth", "Enabled": true },
+		{ "Name": "KawaiiPhysics", "Enabled": true }
 	]
 }

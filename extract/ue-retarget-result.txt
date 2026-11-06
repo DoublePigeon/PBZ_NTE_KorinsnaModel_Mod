@@ -1,5 +1,5 @@
 stale assets left: []
-could not delete /Game/Korinsna/IKR_Hun, moving it to /Game/KorinsnaStale/IKR_Hun_23
+could not delete /Game/Korinsna/IKR_Hun, moving it to /Game/KorinsnaStale/IKR_Hun_73
 created /Game/Korinsna/IKR_Hun -> /Game/Korinsna/IKR_Hun.IKR_Hun
 created /Game/Korinsna/IKR_Korinsna -> /Game/Korinsna/IKR_Korinsna.IKR_Korinsna
 sync ref pose: synced /Game/Korinsna/SK_Korinsna_Skeleton.SK_Korinsna_Skeleton <- SK_Korinsna (bones 369 -> 369)
@@ -122,5 +122,70 @@ aligned 49 chain(s), retarget pose saved
   RightPinky3      enableFK=True  rot=INTERPOLATED: 0> rotA=1.00 trans=NONE: 0>        transA=1.00
 FK chain settings applied to 49 chain(s)
 chains without a source mapping: none
-anim blueprint created=True
+anim blueprint created=True (physics config J:\VS_Projects\PBZ_KorinsnaSkinMod\ue\kawaii_config.json)
   generated class=/Game/Korinsna/ABP_Korinsna_Retarget.ABP_Korinsna_Retarget_C
+  skeleton SK_Korinsna_Skeleton refbones=369
+    ref Bip001-Pelvis      local=(-0.00, 1.50, 94.72) component=(-0.00, 1.50, 94.72) alt=(-0.00, 1.50, 94.72) scale=(1.00)
+    ref Bip001-L-Thigh     local=(0.00, -0.00, 8.65) component=(8.65, 1.50, 94.72) alt=(-1.75, 8.37, -85.70) scale=(1.00)
+    ref Bip001-L-Calf      local=(0.00, -13.26, 0.00) component=(10.55, -0.34, 55.11) alt=(0.73, -23.52, -89.32) scale=(1.00)
+    ref Bip001-L-Foot      local=(-0.00, -14.33, -0.00) component=(12.60, -4.76, 12.96) alt=(-49.80, 10.11, -92.91) scale=(1.00)
+    ref Bip001-L-Forearm   local=(0.00, -7.29, 0.00) component=(27.28, 2.79, 116.58) alt=(61.55, -128.37, -36.62) scale=(1.00)
+    ref Bip001-L-Hand      local=(0.00, -7.14, 0.00) component=(37.68, 11.18, 99.83) alt=(27.99, -151.71, 61.62) scale=(1.00)
+    ref head_Bone001       local=(-0.04, -5.55, -0.00) component=(-0.00, 0.31, 143.37) alt=(-94.61, -11.04, -41.76) scale=(1.00)
+    ref head_Bone003       local=(0.44, -16.75, -0.00) component=(-0.00, 1.53, 154.51) alt=(3.68, -58.40, 94.72) scale=(1.00)
+    ref liuhai_1           local=(-2.13, -12.58, -1.61) component=(-1.61, 5.01, 166.79) alt=(-102.37, -5.12, 46.28) scale=(1.00)
+    ref b_skirt_1          local=(10.89, -11.04, 0.00) component=(0.00, -6.31, 108.11) alt=(10.39, -12.46, 94.72) scale=(1.00)
+    ref l_skirt_5          local=(0.00, -6.75, 0.00) component=(14.27, 16.21, 83.39) alt=(-54.83, -49.70, -72.09) scale=(1.00)
+  graph AnimGraph: 9 node(s)
+    kawaii[0] root=Bip001-Pelvis  hasBone=yes settings: damping=0.55 stiffness=0.30 worldDampLoc=1.00 worldDampRot=1.00 limitAngle=0.0 boneRadius=2.50 dummy=0.0 fps=60 space=2 wind=off worldCol=off ignoreSelf=yes base=Bip001-Pelvis spheres=18 exclude=3 capsules=0 alpha=1.00
+        sphere bone=Bip001-Pelvis        offset=(0.0, 0.0, 0.0) radius=11.0 enabled=yes
+        sphere bone=Bip001-Pelvis        offset=(4.0, 0.0, 0.0) radius=9.0 enabled=yes
+        sphere bone=Bip001-L-Thigh       offset=(0.2, -4.0, 0.2) radius=9.5 enabled=yes
+        sphere bone=Bip001-L-Thigh       offset=(0.6, -11.9, 0.7) radius=9.5 enabled=yes
+        sphere bone=Bip001-L-Thigh       offset=(1.0, -19.8, 1.2) radius=9.5 enabled=yes
+        sphere bone=Bip001-L-Thigh       offset=(1.4, -27.7, 1.6) radius=9.5 enabled=yes
+        sphere bone=Bip001-L-Thigh       offset=(1.8, -35.6, 2.1) radius=9.5 enabled=yes
+        sphere bone=Bip001-R-Thigh       offset=(0.2, -4.0, -0.2) radius=9.5 enabled=yes
+        sphere bone=Bip001-R-Thigh       offset=(0.6, -11.9, -0.7) radius=9.5 enabled=yes
+        sphere bone=Bip001-R-Thigh       offset=(1.0, -19.8, -1.2) radius=9.5 enabled=yes
+        sphere bone=Bip001-R-Thigh       offset=(1.4, -27.7, -1.6) radius=9.5 enabled=yes
+        sphere bone=Bip001-R-Thigh       offset=(1.8, -35.6, -2.1) radius=9.5 enabled=yes
+        sphere bone=Bip001-L-Calf        offset=(-1.1, -8.3, 1.2) radius=10.0 enabled=yes
+        sphere bone=Bip001-L-Calf        offset=(-2.7, -20.8, 3.1) radius=9.5 enabled=yes
+        sphere bone=Bip001-L-Calf        offset=(-4.6, -35.4, 5.3) radius=9.0 enabled=yes
+        sphere bone=Bip001-R-Calf        offset=(-1.1, -8.3, -1.2) radius=10.0 enabled=yes
+        sphere bone=Bip001-R-Calf        offset=(-2.7, -20.8, -3.1) radius=9.5 enabled=yes
+        sphere bone=Bip001-R-Calf        offset=(-4.6, -35.4, -5.3) radius=9.0 enabled=yes
+    kawaii[1] root=head_Bone003   hasBone=yes settings: damping=0.60 stiffness=0.30 worldDampLoc=1.00 worldDampRot=1.00 limitAngle=50.0 boneRadius=0.60 dummy=0.0 fps=60 space=2 wind=off worldCol=off ignoreSelf=yes base=head_Bone003 spheres=5 exclude=12 capsules=0 alpha=1.00
+        sphere bone=head_Bone001         offset=(0.0, 0.0, 0.0) radius=7.0 enabled=yes
+        sphere bone=head_Bone002         offset=(0.0, 0.0, 0.0) radius=6.5 enabled=yes
+        sphere bone=head_Bone003         offset=(0.0, 0.0, 0.0) radius=6.0 enabled=yes
+        sphere bone=Bip001-Neck          offset=(1.0, 0.0, 0.0) radius=6.0 enabled=yes
+        sphere bone=Bip001-Spine1        offset=(10.0, 0.0, 0.0) radius=11.0 enabled=yes
+    kawaii[2] root=head_Bone003   hasBone=yes settings: damping=0.60 stiffness=0.30 worldDampLoc=1.00 worldDampRot=1.00 limitAngle=50.0 boneRadius=0.60 dummy=0.0 fps=60 space=2 wind=off worldCol=off ignoreSelf=yes base=head_Bone003 spheres=5 exclude=10 capsules=0 alpha=1.00
+        sphere bone=head_Bone001         offset=(0.0, 0.0, 0.0) radius=7.0 enabled=yes
+        sphere bone=head_Bone002         offset=(0.0, 0.0, 0.0) radius=6.5 enabled=yes
+        sphere bone=head_Bone003         offset=(0.0, 0.0, 0.0) radius=6.0 enabled=yes
+        sphere bone=Bip001-Neck          offset=(1.0, 0.0, 0.0) radius=6.0 enabled=yes
+        sphere bone=Bip001-Spine1        offset=(10.0, 0.0, 0.0) radius=11.0 enabled=yes
+    kawaii[3] root=head_Bone002   hasBone=yes settings: damping=0.60 stiffness=0.30 worldDampLoc=1.00 worldDampRot=1.00 limitAngle=50.0 boneRadius=0.60 dummy=0.0 fps=60 space=2 wind=off worldCol=off ignoreSelf=yes base=head_Bone002 spheres=5 exclude=1 capsules=0 alpha=1.00
+        sphere bone=head_Bone001         offset=(0.0, 0.0, 0.0) radius=7.0 enabled=yes
+        sphere bone=head_Bone002         offset=(0.0, 0.0, 0.0) radius=6.5 enabled=yes
+        sphere bone=head_Bone003         offset=(0.0, 0.0, 0.0) radius=6.0 enabled=yes
+        sphere bone=Bip001-Neck          offset=(1.0, 0.0, 0.0) radius=6.0 enabled=yes
+        sphere bone=Bip001-Spine1        offset=(10.0, 0.0, 0.0) radius=11.0 enabled=yes
+    kawaii[4] root=head_Bone002   hasBone=yes settings: damping=0.60 stiffness=0.30 worldDampLoc=1.00 worldDampRot=1.00 limitAngle=50.0 boneRadius=0.60 dummy=0.0 fps=60 space=2 wind=off worldCol=off ignoreSelf=yes base=head_Bone002 spheres=5 exclude=2 capsules=0 alpha=1.00
+        sphere bone=head_Bone001         offset=(0.0, 0.0, 0.0) radius=7.0 enabled=yes
+        sphere bone=head_Bone002         offset=(0.0, 0.0, 0.0) radius=6.5 enabled=yes
+        sphere bone=head_Bone003         offset=(0.0, 0.0, 0.0) radius=6.0 enabled=yes
+        sphere bone=Bip001-Neck          offset=(1.0, 0.0, 0.0) radius=6.0 enabled=yes
+        sphere bone=Bip001-Spine1        offset=(10.0, 0.0, 0.0) radius=11.0 enabled=yes
+    kawaii nodes: 5
+    link AnimGraphNode_RetargetPoseFromMesh.Pose -> AnimGraphNode_LocalToComponentSpace.LocalPose
+    link AnimGraphNode_KawaiiPhysics.Pose -> AnimGraphNode_KawaiiPhysics.ComponentPose
+    link AnimGraphNode_KawaiiPhysics.Pose -> AnimGraphNode_KawaiiPhysics.ComponentPose
+    link AnimGraphNode_KawaiiPhysics.Pose -> AnimGraphNode_KawaiiPhysics.ComponentPose
+    link AnimGraphNode_KawaiiPhysics.Pose -> AnimGraphNode_KawaiiPhysics.ComponentPose
+    link AnimGraphNode_KawaiiPhysics.Pose -> AnimGraphNode_ComponentToLocalSpace.ComponentPose
+    link AnimGraphNode_LocalToComponentSpace.ComponentPose -> AnimGraphNode_KawaiiPhysics.ComponentPose
+    link AnimGraphNode_ComponentToLocalSpace.Pose -> AnimGraphNode_Root.Result

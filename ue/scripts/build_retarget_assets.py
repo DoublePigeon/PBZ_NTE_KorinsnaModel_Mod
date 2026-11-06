@@ -40,6 +40,13 @@ ANIM_BP = DEST + "/ABP_Korinsna_Retarget"
 # are recorded next to it in the file's `note` fields.
 CONFIG_PATH = os.path.join(ROOT, "ue", "retarget_config.json")
 
+# Hair / skirt physics. Both authoring inputs are data, never code:
+#   * ue/rigidbody_config.json - the active path: the engine's own RigidBody node + a physics asset
+#     generated from this file (component-space simulation, so world movement never enters the solver);
+#   * ue/kawaii_config.json - the previous KawaiiPhysics path, kept as a reference/fallback (its "mode"
+#     key decides which one the C++ authoring step builds).
+PHYSICS_CONFIG = os.path.join(ROOT, "ue", "kawaii_config.json")
+
 
 def load_config():
     import json
@@ -388,13 +395,20 @@ def main():
     if skeleton is None:
         raise SystemExit("missing " + TARGET_SKEL)
 
+    # Hair / skirt physics: rigged in ue/rigidbody_config.json (the same data-driven rule as
+    # ue/retarget_config.json). The C++ authoring step generates the physics asset named there and adds a
+    # single RigidBody node after the retarget node.
     ok = unreal.KorinsnaEditorLibrary.create_retarget_anim_blueprint(
-        ANIM_BP, skeleton.get_path_name(), retargeter.get_path_name())
-    log("anim blueprint created=%s" % ok)
+        ANIM_BP, skeleton.get_path_name(), retargeter.get_path_name(), PHYSICS_CONFIG.replace("\\", "/"))
+    log("anim blueprint created=%s (physics config %s)" % (ok, PHYSICS_CONFIG))
     if EAL.does_asset_exist(ANIM_BP):
         abp = EAL.load_asset(ANIM_BP)
         log("  generated class=%s" % (
             abp.generated_class().get_path_name() if abp and abp.generated_class() else "None"))
+        # Prove what was authored: the runtime log cannot show a node whose root bone or collider set
+        # did not resolve. Reports "no kawaii nodes" when the rigid-body path is active.
+        for line in str(unreal.KorinsnaEditorLibrary.describe_kawaii_physics(ANIM_BP)).splitlines():
+            log("  " + line)
 
     with open(RESULT, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines))

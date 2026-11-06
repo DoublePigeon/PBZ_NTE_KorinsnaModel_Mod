@@ -1,0 +1,16 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\kawaiiphysicsed\\module.kawaiiphysicsed.cpp",
+        "ProvidedModule": "",
+        "PCH": "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\intermediate\\build\\win64\\x64\\projectpbzeditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.valexpapi.cpp20.h.pch",
+        "Includes": [
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\kawaiiphysicsed\\definitions.kawaiiphysicsed.h",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\unrealeditor\\inc\\kawaiiphysicsed\\uht\\kawaiiphysicsed.init.gen.cpp",
+            "j:\\vs_projects\\pbz_korinsnaskinmod\\ue\\projectpbz\\plugins\\kawaiiphysics\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\kawaiiphysicsed\\permoduleinline.gen.cpp",
+            "k:\\unrealengine\\ue_5.7\\engine\\source\\runtime\\core\\public\\hal\\permoduleinline.inl"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

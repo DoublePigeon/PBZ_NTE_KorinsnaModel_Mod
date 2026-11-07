@@ -72,10 +72,13 @@ return {
         -- everything else a copy owns (accessories, static-mesh cards, grooms) is hidden too
         hide_copy_outfit = true,
         -- the sweep that finds those components walks the whole level (five component classes), so it
-        -- runs rarely: every `copy_rescan_scans`, the moment a hero-owned component spawns (the object
-        -- listener sets `copy_dirty`), or when a cached one went away - never more often than
-        -- `copy_rescan_min_scans`, because a cutscene spawns components continuously.
+        -- runs rarely: every `copy_rescan_scans`, or the moment the cached list does not exist (a map
+        -- change / a fresh hero) - never more often than `copy_rescan_min_scans`. Everything in between
+        -- is maintained by the object listener, one component at a time.
         copy_rescan_scans = 60,
+        -- 4 scans (2 s): the only thing that sets `copy_dirty` now is a cloth / groom component spawning,
+        -- which is also what a cutscene copy brings with it - so this is the delay before a copy's
+        -- original outfit is hidden again, not a periodic cost.
         copy_rescan_min_scans = 4,
         -- re-arm the retarget when the game points the part component back at CharacterMesh0 (the
         -- model falling back to its reference pose after an interactive animation). See watch_pose():
@@ -136,9 +139,12 @@ return {
     log_level = 1,
 
     -- Scans between two level-wide searches for the components the per-scan work acts on (weapons,
-    -- scabbards, Hun's waist knife). ONE search per scan replaces the three that the three jobs used to
-    -- run separately; the hits are cached as names and the work then runs over those.
-    target_rescan_scans = 1,
+    -- scabbards, Hun's waist knife). This is a SLOW AUDIT only: `FindAllOf` walks the whole UObject
+    -- array (>150k objects in this game) and each hit then walks up to 8 attach parents, so it is a
+    -- visible hitch whenever it runs (measured: ~40-190 ms). Weapons, scabbards and back items are
+    -- classified when they spawn (`classify_target` from the object listener) and `reset_targets()`
+    -- forces one rebuild after a map change / a fresh hero, which covers what the walk was for.
+    target_rescan_scans = 120,
     -- scans between two attempts to find the hero while he is still unknown, and between two audit
     -- look-ups once he is known (the object listener normally makes both unnecessary)
     discover_every = 4,

@@ -182,12 +182,6 @@ local DEFAULTS = {
     -- position). This is how a component that still draws part of the original outfit is identified.
     dump_census = false,
 
-    -- diagnostic: count which classes the object listener actually reports, and how often owner/mesh
-    -- are still unreadable when it fires. Decides whether the hiding caches can be fed by events.
-    report_listener_classes = false,
-
-    -- diagnostic: per-scan position/parent of 痴者醉剑, the weapon that leaves the hand on its own
-
     toggle_key = "F9",
     diagnostics_key = "F11",
     rescan_interval = 0.5,
@@ -199,13 +193,15 @@ local DEFAULTS = {
     profile_slow_ms = 15,
     profile_gap_factor = 2.0,
 
-    -- How many spawned components one scan classifies, and how many deferred ones it re-checks. The
-    -- listener only appends to a queue (see the spawn intake section); this is what bounds the work per
-    -- scan when a level load queues thousands at once. `spawn_batch_load` applies while the hero has not
-    -- been adopted yet, i.e. during a load.
-    spawn_batch = 300,
-    spawn_batch_load = 4000,
-    spawn_retry = 32,
+    -- Scans between two rebuilds of the hero's part list (the one used to silence their shadow pass).
+    -- The list only changes with the outfit, so this is a slow audit.
+    quiet_parts_refresh = 120,
+
+    -- Garment notifications are queued (see `adopt_garment`): how many of them one scan may read, and the
+    -- queue cap. Both are small because these are rare classes; the cap only guards against a pathological
+    -- level.
+    garment_batch = 16,
+    garment_queue_max = 64,
 
     -- diagnostic switch: only report what is loaded, never change anything
     probe_only = false,
@@ -334,6 +330,13 @@ local function trace_problem(msg)
     write_line(1, msg)
 end
 
+-- Opt-in diagnostic that must also work in an otherwise silent profile. `profile_scans` is what turns it
+-- on, and measuring a freeze with the full dev log running would measure the logger instead of the mod -
+-- so these lines are deliberately written at level 1.
+local function trace_profile(msg)
+    write_line(1, msg)
+end
+
 -- Everything else is a diagnostic and belongs to the dev profile.
 local function trace(msg)
     write_line(2, msg)
@@ -451,7 +454,7 @@ local function part_mesh_name(component)
     -- mesh components too, so "not skeletal" was not a good enough guard). A stale wrapper whose
     -- methods are not bound ("attempt to call a TrivialObject value") throws the same way, and release
     -- is only allowed to log real problems - hence `soft` rather than `try`.
-    local class = usable(try("GetClass", function() return component:GetClass() end))
+    local class = usable(soft(function() return component:GetClass() end))
     local class_name = class and short_name(full_name(class)) or nil
     if class_name == nil or not class_name:find("Static", 1, true) then return nil end
     local mesh = soft(function() return component:GetStaticMesh() end)
@@ -545,7 +548,10 @@ end
 -- strings, so this never touches an object that may already be destroyed.
 local function belongs_to_actor(component, actor_name)
     if component == nil or actor_name == nil then return false end
-    local owner = try("GetOwner", function() return component:GetOwner() end)
+    -- `soft`, not `try`: this runs for every spawned component in the level, and a `try` failure writes
+    -- a line to the log file (open + write + close) on the game thread. A stale wrapper that fails here
+    -- is not a mod problem worth a synchronous file operation.
+    local owner = soft(function() return component:GetOwner() end)
     local owner_key = usable(owner) and full_name(owner) or nil
     return owner_key ~= nil and owner_key == actor_name
 end
@@ -556,7 +562,7 @@ end
 local function attached_to_hero(component)
     local node = component
     for _ = 1, 8 do
-        local parent = try("GetAttachParent", function() return node:GetAttachParent() end)
+        local parent = soft(function() return node:GetAttachParent() end)
         if not usable(parent) then return false end
         local key = full_name(parent)
         if key ~= nil and (key == state.source_name or key == state.carrier_name) then
@@ -586,7 +592,8 @@ local RESET_KEYS = {
     "weapon_sockets", "weapon_reanchor", "weapon_reanchor_ready",
     "copy_hidden", "copy_leader", "copy_reported", "cloth_seen", "cloth_reported",
     "copy_seen", "copy_outfit_reported", "copy_list", "copy_carriers", "cloth_list",
-    "copy_dirty", "copy_scan_tick", "copy_index", "cloth_index", "undecided_copies",
+    "copy_dirty", "copy_scan_tick", "copy_index", "cloth_index",
+    "copy_scanned",
     "discover_tick", "discover_sweep_tick", "weapon_reanchor_wait",
     "leader_clears", "pose_post_missing", "shadow_write_tries",
 }
@@ -703,12 +710,19 @@ end
 -- Collects every scene component below a root by walking children, which returns its result through a
 -- TArray out-parameter. That array is a plain Lua table here, so it can actually be read - unlike the
 -- TArray that K2_GetComponentsByClass returns, whose elements come back as null wrappers.
+--
+-- Silent on failure (`soft`): this is now on a per-scan path, and `try` writes a line to the log file for
+-- every failing call - a synchronous file open/write/close on the game thread. One trace is kept so a
+-- build where this stops working is still visible.
 local function children_of(component, out)
     if not valid(component) then return out end
     local collected = {}
-    local ok = try("GetChildrenComponents",
-        function() component:GetChildrenComponents(true, collected) end)
-    if ok ~= nil or #collected > 0 then
+    local ok = pcall(function() return component:GetChildrenComponents(true, collected) end)
+    if not ok and not state.children_failed then
+        state.children_failed = true
+        trace("children_of: GetChildrenComponents is not callable here")
+    end
+    if ok or #collected > 0 then
         for index = 1, #collected do
             local child = collected[index]
             if usable(child) then
@@ -1855,7 +1869,10 @@ local function classify_target(component)
     -- Only what belongs to / hangs off the hero, plus weapon actors (their owner name is
     -- `BP_Weapon_*`, not the hero). Everything else in the level is somebody else's business - that
     -- filter is what keeps NPC weapons and scabbards out of this.
-    local owner_name = full_name(try("GetOwner", function() return component:GetOwner() end))
+    -- `soft`, not `try`: this runs for every spawned component in the level, and a `try` failure writes
+    -- a line to the log file (open + write + close) on the game thread. A stale wrapper that fails here
+    -- is not a mod problem worth a synchronous file operation.
+    local owner_name = full_name(soft(function() return component:GetOwner() end))
     if not (belongs_to_actor(component, state.actor_name)
         or attached_to_hero(component) or is_weapon_actor(owner_name)) then
         return
@@ -1889,6 +1906,23 @@ refresh_targets = function()
     end
     trace2(string.format("targets: %d weapon(s), %d scabbard(s), %d back item(s) cached",
         #targets.weapons, #targets.scabbards, #targets.back))
+end
+
+-- The per-scan way weapons are found now: every weapon actor the hero holds or carries is attached
+-- below his own body or below our carrier, so walking just those two subtrees finds them without a
+-- level-wide search. This replaced the object listener, which had to cover the engine mesh classes and
+-- therefore fired for the whole level (measured: ~14800 notifications in one fight, and the dispatch
+-- alone stalled the game for about a second at a time).
+local function refresh_targets_near_hero()
+    if state.actor_name == nil then return end
+    for _, root in ipairs({ state.source, state.body or state.carrier }) do
+        if valid(root) then
+            local list = children_of(root, {})
+            for index = 1, #list do
+                classify_target(list[index])
+            end
+        end
+    end
 end
 
 
@@ -2078,7 +2112,10 @@ local function anchor_held_weapons()
     local source_name = full_name(source)
 
     -- Everything below iterates the cached weapon components (see refresh_targets): a handful of
-    -- names instead of a walk over every skeletal mesh in the level.
+    -- names instead of a walk over every skeletal mesh in the level. The cached list is topped up from
+    -- the hero's own component subtrees every scan, which is what makes a drawn / swapped weapon show up
+    -- immediately now that the engine mesh classes are no longer listened to.
+    refresh_targets_near_hero()
     refresh_targets()
 
     -- After a pose heal the weapon keeps the relative transform it was given while the hand bone was
@@ -2287,7 +2324,7 @@ end
 -- True when the actor is the pawn the player actually controls. Cutscene / preview copies of the hero
 -- exist as extra actors with the same part assets; those must never take over the retarget, and they
 -- are exactly the actors whose leftover outfit has to be hidden.
-local player_pawn_cache = { tick = -1, name = nil, logged = false }
+local player_pawn_cache = { tick = -1, name = nil, logged = false, pawn = nil }
 
 -- Optional accessor: several of the names below do not exist on a controller in this build
 -- (`GetControlledPawn` / `GetPawn` fail with "attempt to call a TrivialObject value"). `try` would log
@@ -2299,8 +2336,26 @@ local function optional_call(obj, method)
     return usable(value)
 end
 
-local function player_pawn_name()
-    if player_pawn_cache.tick == state.tick then return player_pawn_cache.name end
+-- The player's pawn, resolved by polling and then remembered.
+--
+-- `FindAllOf("PlayerController")` walks the whole UObject array (measured ~40 ms), so it must not run
+-- every scan. The pawn object itself is kept: it is one reference (the same thing `state.actor` already
+-- holds), revalidated with `valid()` and re-resolved only when it stops being valid - a map change or a
+-- pawn swap. Resolving the *actor* by name is not an option here: `StaticFindObject` is not reliable for
+-- actor names, which is why the object is cached instead.
+local function resolve_player_pawn()
+    if player_pawn_cache.tick == state.tick and player_pawn_cache.pawn ~= nil then
+        return player_pawn_cache.pawn
+    end
+    player_pawn_cache.tick = state.tick
+
+    local cached = player_pawn_cache.pawn
+    if cached ~= nil then
+        if valid(cached) then return cached end
+        player_pawn_cache.pawn = nil
+        player_pawn_cache.name = nil
+    end
+
     local found = nil
     local count = 0
     local controllers = try("FindAllOf PlayerController",
@@ -2309,25 +2364,27 @@ local function player_pawn_name()
         for _, controller in pairs(controllers) do
             if usable(controller) then
                 count = count + 1
-                local pawn = optional_call(controller, "K2_GetPawn")
+                found = optional_call(controller, "K2_GetPawn")
                     or optional_call(controller, "GetControlledPawn")
                     or optional_call(controller, "GetPawn")
-                if pawn ~= nil then
-                    found = full_name(pawn)
-                    break
-                end
+                if found ~= nil then break end
             end
         end
     end
-    if not player_pawn_cache.logged or player_pawn_cache.name ~= found then
+    local found_name = found ~= nil and full_name(found) or nil
+    if not player_pawn_cache.logged or player_pawn_cache.name ~= found_name then
         player_pawn_cache.logged = true
-        player_pawn_cache.name = found
         trace(string.format("pawn: %s (%d controller(s) seen)",
-            found and short_name(found) or "unresolved", count))
+            found_name and short_name(found_name) or "unresolved", count))
     end
-    player_pawn_cache.tick = state.tick
-    player_pawn_cache.name = found
+    player_pawn_cache.pawn = found
+    player_pawn_cache.name = found_name
     return found
+end
+
+local function player_pawn_name()
+    local pawn = resolve_player_pawn()
+    return pawn ~= nil and player_pawn_cache.name or nil
 end
 
 local function is_player_pawn(actor_name)
@@ -2449,9 +2506,13 @@ end
 --
 -- The young hero uses different meshes (`Hun_Young_*`), is never a copy of the adult hero, and keeps
 -- his outfit.
+-- The classes whose components on a hero copy have to be hidden. `FindAllOf` matches subclasses, so
+-- `SkeletalMeshComponentBudgeted` is covered by `SkeletalMeshComponent`. Cloth and grooms are NOT listed
+-- here: `collect_hero_garments` hides those for any hero-owned actor (copies included), so listing them
+-- would only walk the same class twice. Each entry is one level-wide search, and each search is a
+-- visible hitch, so the list stays as short as it can be while still covering the outfit.
 local COPY_CLASSES = {
-    "SkeletalMeshComponent", "StaticMeshComponent", "ChaosClothComponent",
-    "GroomComponent", "SkeletalMeshComponentBudgeted",
+    "SkeletalMeshComponent", "StaticMeshComponent",
 }
 
 local function copy_component_entry(obj, class_name, owner_name)
@@ -2698,8 +2759,12 @@ local function sweep_other_heroes()
     local since_last = state.tick - (state.copy_scan_tick or -100000)
     local want_copies = config.hide_copy_outfit or config.hide_copy_bodies
     local want_cloth = config.hide_hero_cloth or config.hide_copy_bodies
-    local need_copies = want_copies and state.copy_list == nil
-    local need_cloth = want_cloth and (state.cloth_list == nil or state.copy_dirty == true)
+    -- A garment that belongs to a hero copy asks for one level-wide rebuild of the copy list (see
+    -- `adopt_garment`), deduped per actor: a copy reports a dozen garments, and each rebuild is a few
+    -- full-level searches.
+    local need_copies = want_copies
+        and (state.copy_list == nil or state.copy_dirty == true)
+    local need_cloth = want_cloth and state.cloth_list == nil
     local allowed = since_last >= (config.copy_rescan_min_scans or 4)
     if (need_copies or need_cloth) and allowed then
         state.copy_dirty = false
@@ -2753,7 +2818,7 @@ local function hero_part_components()
     end
 
     local refresh = state.quiet_parts ~= nil and state.quiet_parts_actor == state.actor_name
-        and (state.tick - (state.quiet_parts_tick or 0)) < 20
+        and (state.tick - (state.quiet_parts_tick or 0)) < (config.quiet_parts_refresh or 120)
     if refresh then
         return state.quiet_parts
     end
@@ -3768,38 +3833,47 @@ end
 -- so the hero is looked up by polling: often while he is still unknown, and rarely afterwards as an
 -- audit (the game can re-create the actor without the old one going invalid yet). Anchored on the
 -- player pawn, so a cutscene copy can never be taken for the player.
+-- `discover_hero` is the only discovery mechanism now that the engine mesh classes are no longer
+-- listened to, so it has to be cheap enough to run often - hence the cached pawn above.
 local function discover_hero()
-    local known = state.actor_name ~= nil
-    local every = known and (config.discover_audit_scans or 60) or (config.discover_every or 4)
+    -- "Complete" needs both the body (the retarget source) and the carrier part. Until both are held,
+    -- the fast cadence applies: a missing carrier is the difference between a working mod and Korinsna
+    -- standing in her reference pose.
+    local complete = state.actor_name ~= nil and valid(state.source) and valid(state.carrier)
+    local every = complete and (config.discover_audit_scans or 60) or (config.discover_every or 4)
     if state.tick - (state.discover_tick or -100000) < every then return end
     state.discover_tick = state.tick
-    local pawn = nil
-    local controllers = try("FindAllOf PlayerController",
-        function() return FindAllOf("PlayerController") end)
-    if type(controllers) == "table" then
-        for _, controller in pairs(controllers) do
-            pawn = optional_call(controller, "K2_GetPawn")
-                or optional_call(controller, "GetControlledPawn")
-                or optional_call(controller, "GetPawn")
-            if pawn ~= nil then break end
-        end
-    end
+    local pawn = resolve_player_pawn()
     if pawn == nil then return end
     -- `consider` decides whether this actor replaces the one we hold (it only does so for the pawn)
-    if known and full_name(pawn) == state.actor_name then return end
-    -- the pawn's own skeletal mesh components; `K2_GetComponentsByClass` is the enumeration this build
-    -- does support (`AActor:GetRootComponent` is not callable from Lua here)
-    local list = component_list(pawn)
-    local count = try("component count", function() return #list end) or 0
-    for index = 1, count do
-        local obj = nth(list, index)
-        if valid(obj) then
-            local name = mesh_name(obj)
-            if matches_any(name, config.source_mesh_names)
-                or (name == config.carrier_mesh_name and bone_count(obj) ~= 274) then
-                -- `consider` adopts the actor and runs setup(); one hint per pass is enough
-                consider(obj)
-                return
+    if complete and full_name(pawn) == state.actor_name then return end
+
+    -- The pawn's own part components, found by owner instead of `K2_GetComponentsByClass`: the TArray
+    -- that call returns comes back as null wrappers in this build (see the note on `children_of`), so the
+    -- enumeration was silently empty - which is exactly why polling "never saw the hero" and the object
+    -- listener had to cover for it. `FindAllOf` works, and its cost only matters while the hero is still
+    -- unknown: once he is adopted this function returns above, every time.
+    local pawn_name = full_name(pawn)
+    local objects = try("FindAllOf SkeletalMeshComponent",
+        function() return FindAllOf("SkeletalMeshComponent") end)
+    if type(objects) ~= "table" then return end
+    -- `consider` on EVERY match, not just the first: the hero has two components we care about - the
+    -- body (the retarget source, mesh `Hun_Body_Simple`) and the part the mod ships (mesh
+    -- `Hun_Head_New`, which becomes the carrier Korinsna is drawn on). Both used to be handed over by
+    -- the object listener; returning after the body left the carrier undiscovered, and the mod sat there
+    -- with "no component with mesh Hun_Head_New" while Korinsna stayed in her reference pose.
+    local matched = 0
+    for _, obj in pairs(objects) do
+        if usable(obj) and not is_cdo(obj) then
+            local owner = soft(function() return obj:GetOwner() end)
+            if owner ~= nil and full_name(owner) == pawn_name then
+                local name = mesh_name(obj)
+                if matches_any(name, config.source_mesh_names)
+                    or (name == config.carrier_mesh_name and bone_count(obj) ~= 274) then
+                    consider(obj)
+                    matched = matched + 1
+                    if matched >= 4 then break end
+                end
             end
         end
     end
@@ -3828,175 +3902,108 @@ local function discover_hero()
         end
     end
 end
+-- Scan timing, declared before `scan()` because it writes them and the loop reads them. A local declared
+-- after `scan()` would be a global inside it, which is how an earlier version silently reported "0.0ms".
+local scan_last_end = nil
+local scan_last_cost = 0
+local phase_setup = 0
+local phase_sweep = 0
 
--- Which component classes the object listener really reports. Kept as a diagnostic because it is what
--- decided the architecture: the listener does cover subclasses (`SkeletalMeshComponentBudgeted`,
--- `SplineMeshComponent`, `InstancedStaticMeshComponent` all show up), but it never reports a
--- `ChaosClothComponent` or a `GroomComponent` - those two are still found by their own level walk.
-local listener_census = { by_class = {}, total = 0, mesh_nil = 0, owner_nil = 0, unknown = 0 }
-
-local function tally_listener_class(obj, actor_name, mesh)
-    listener_census.total = listener_census.total + 1
-    if mesh == nil then listener_census.mesh_nil = listener_census.mesh_nil + 1 end
-    if actor_name == nil then listener_census.owner_nil = listener_census.owner_nil + 1 end
-    local class = soft(function() return obj:GetClass() end)
-    local class_name = class ~= nil and short_name(full_name(class)) or nil
-    if class_name == nil then
-        listener_census.unknown = listener_census.unknown + 1
-        return
-    end
-    local seen = listener_census.by_class[class_name]
-    listener_census.by_class[class_name] = (seen or 0) + 1
-    if seen == nil then
-        trace("listener class: " .. class_name ..
-            " (first of this class; total=" .. listener_census.total .. ")" )
-    end
-    if listener_census.total % 500 == 0 then
-        local names = {}
-        for key in pairs(listener_census.by_class) do names[#names + 1] = key end
-        table.sort(names)
-        local parts = {}
-        for _, key in ipairs(names) do
-            parts[#parts + 1] = key .. "=" .. listener_census.by_class[key]
-        end
-        trace(string.format("listener census: %d classified, mesh=nil %d, owner=nil %d, classes %s",
-            listener_census.total, listener_census.mesh_nil, listener_census.owner_nil,
-            table.concat(parts, " ")))
-    end
+local function now_ms()
+    if type(os.mtime) == "function" then return os.mtime() end
+    return os.clock() * 1000
 end
 
--- ---------------------------------------------------------------------------------------------
--- Spawn intake
+-- Garment notifications, drained by `scan()`.
 --
--- The object listener used to hand every component to `ExecuteInGameThread` twice, because the object
--- is still under construction when the notification arrives. Measured in game, that is 2 queued
--- game-thread jobs per component - 11200 of them in two minutes on a normal session, and 99% of those
--- components are level props the mod does not care about.
+-- The callback cannot read the object (it fires while the component is still under construction), so the
+-- object is queued and read one scan later. The queue is small because these two classes are rare, and
+-- it exists so a cutscene copy's outfit can be found WITHOUT a level-wide search: one garment identifies
+-- the actor, and the rest of that actor's components are its own subtree.
+local garment_queue = { head = 1, tail = 0 }
+
+local function queue_garment(obj)
+    if garment_queue.tail - garment_queue.head + 1 >= (config.garment_queue_max or 64) then return end
+    garment_queue.tail = garment_queue.tail + 1
+    garment_queue[garment_queue.tail] = obj
+end
+
+-- Hides one garment and, when it belongs to a hero copy, the rest of that copy's components.
 --
--- Instead the callback does nothing but append the object to this queue (no engine call, no hop), and
--- the 2 Hz scan drains it in bounded batches. Two things fall out of that: the cost per notification
--- is a table store, and classification runs half a second after the spawn, where the owner and the mesh
--- asset are actually readable (3% of the objects were still owner-less even after the two hops).
--- ---------------------------------------------------------------------------------------------
-local spawn_queue = { head = 1, tail = 0 }
-
-local function queue_spawn(obj)
-    local tail = spawn_queue.tail + 1
-    spawn_queue.tail = tail
-    spawn_queue[tail] = obj
-end
-
--- Re-decide an entry later. `owner == nil` means the object was read before the actor had finished
--- assigning it, and `pawn == nil` means the hero could not be told apart from a cutscene copy yet
--- (`is_hero_copy` needs the pawn). Both are transient; the retry list keeps them out of the level walk.
-local function defer_spawn(obj, class_name)
-    local key = full_name(obj)
-    if key == nil then return end
-    state.undecided_copies = state.undecided_copies or {}
-    state.undecided_copies[key] = class_name or true
-end
-
--- Classify one spawned component: is it (part of) the hero, a cutscene copy of him, or a prop?
-local function classify_spawn(obj)
-    if obj == nil or not valid(obj) or is_cdo(obj) then return end
+-- `actor_root_of` walks up while the owner stays the same, which lands on the copy's body component;
+-- `children_of` then returns that component's subtree - the parts the copy draws, which is where the
+-- original outfit comes from. Both are cheap and local, and they replace level-wide searches (each one a
+-- ~40 ms hitch) for every cutscene.
+local function adopt_garment(obj)
+    if obj == nil or not valid(obj) or is_cdo(obj) then return 0 end
     local owner = soft(function() return obj:GetOwner() end)
     local owner_name = usable(owner) and full_name(owner) or nil
-    local class = soft(function() return obj:GetClass() end)
-    local class_name = class ~= nil and short_name(full_name(class)) or nil
-    local name = mesh_name(obj)
+    if owner_name == nil or not hero_owned(owner_name) then return 0 end
 
-    if config.report_listener_classes then tally_listener_class(obj, owner_name, name) end
-
-    -- Adoption stays event driven: this is what makes the mod pick the hero up the moment the game
-    -- spawns his parts, instead of guessing from a level walk (which is how he was missed entirely).
-    if name ~= nil then
-        trace2(string.format("new component: %-20s bones=%-5s mesh=%-22s owner=%s",
-            tostring(short_name(full_name(obj))), tostring(bone_count(obj)), tostring(name),
-            tostring(owner_name)))
-        consider(obj)
-    end
-
-    -- Weapons, scabbards and carried items are discovered here as well. `classify_target` filters by
-    -- owner / attach chain itself, and the game spawns the hero's weapon parts with the hero actor as
-    -- their owner, so this is the same verdict the level-wide `refresh_targets` walk produces - without
-    -- the walk (which walked the whole UObject array every 0.5s).
-    classify_target(obj)
-
-    if owner_name == nil then
-        defer_spawn(obj, class_name)
-        return
-    end
-
-    -- Copies (level sequences, the wardrobe's preview) draw the original outfit and have their own
-    -- Korinsna mesh, which has to keep evaluating the retarget.
-    if is_hero_copy(owner_name) then
-        add_copy_entry(obj, class_name, owner_name)
-        return
-    end
-
-    -- The hero's own parts. The mesh asset is not reliable while a component is still being built, so a
-    -- component is queued by name and filtered against the mesh name when it is hidden (see
-    -- `hide_next`): a weapon that has no mesh yet must never be mistaken for a part.
-    if not config.hide_parts then return end
-    local component_name = short_name(full_name(obj))
-    local queue_by_name = component_name ~= nil
-        and (component_name:sub(1, 4) == "mesh" or component_name:sub(1, 9) == "Character")
-    local queue_by_mesh = contains_any(name, config.hide_prefixes)
-        and not contains_any(name, config.keep_visible)
-        and not is_carrier_mesh(name)
-    if queue_by_name or queue_by_mesh then
-        state.spawned_parts = state.spawned_parts or {}
-        local key = full_name(obj)
-        if key and not state.spawned_parts[key] then
-            state.spawned_parts[key] = obj
-            trace2("hide: queued " .. tostring(component_name) .. " mesh=" .. tostring(name) ..
-                " owner=" .. tostring(owner_name))
+    local key = full_name(obj)
+    if key ~= nil then
+        state.cloth_list = state.cloth_list or {}
+        state.cloth_index = state.cloth_index or {}
+        state.cloth_seen = state.cloth_seen or {}
+        if not state.cloth_index[key] then
+            state.cloth_index[key] = owner_name
+            state.cloth_list[#state.cloth_list + 1] = key
+            if not state.cloth_seen[key] then
+                state.cloth_seen[key] = true
+                trace("cloth: hiding " .. tostring(part_mesh_name(obj)) ..
+                    " owner=" .. tostring(short_name(owner_name)))
+            end
         end
     end
+
+    if not is_hero_copy(owner_name) then return 1 end
+    local root = actor_root_of(obj)
+    if not valid(root) then return 1 end
+    local parts = children_of(root, {})
+    local added = 0
+    for index = 1, #parts do
+        local part = parts[index]
+        local part_owner = full_name(soft(function() return part:GetOwner() end))
+        if part_owner == owner_name then
+            local class = soft(function() return part:GetClass() end)
+            local class_name = class ~= nil and short_name(full_name(class)) or nil
+            if add_copy_entry(part, class_name, owner_name) then
+                added = added + 1
+            end
+        end
+    end
+    trace2(string.format("copy: %s -> %d component(s) via its garment",
+        tostring(short_name(owner_name)), added))
+    if added == 0 then
+        -- Measured in game: a copy's parts are not under the garment's component subtree, so the attempt
+        -- above finds nothing. Ask for one level-wide rebuild instead - once per copy actor, which is
+        -- what `copy_scanned` guarantees (the same actor reports a dozen garments).
+        state.copy_scanned = state.copy_scanned or {}
+        if not state.copy_scanned[owner_name] then
+            state.copy_scanned[owner_name] = true
+            state.copy_dirty = true
+            trace("copy: scheduling a rebuild for " .. tostring(short_name(owner_name)))
+        end
+    end
+    return added + 1
 end
 
--- Drains up to `limit` queued objects, then re-tries a few deferred ones.
-local function drain_spawns(limit)
+local function drain_garments(limit)
     local handled = 0
-    while spawn_queue.head <= spawn_queue.tail and handled < limit do
-        local obj = spawn_queue[spawn_queue.head]
-        spawn_queue[spawn_queue.head] = nil
-        spawn_queue.head = spawn_queue.head + 1
+    while garment_queue.head <= garment_queue.tail and handled < limit do
+        local obj = garment_queue[garment_queue.head]
+        garment_queue[garment_queue.head] = nil
+        garment_queue.head = garment_queue.head + 1
         handled = handled + 1
-        if obj ~= nil then classify_spawn(obj) end
+        adopt_garment(obj)
     end
-    if spawn_queue.head > spawn_queue.tail then
-        spawn_queue.head = 1
-        spawn_queue.tail = 0
+    if garment_queue.head > garment_queue.tail then
+        garment_queue.head = 1
+        garment_queue.tail = 0
     end
     return handled
 end
 
--- The deferred entries: only a handful per scan, and only while the list is non-empty.
-local function retry_deferred(limit)
-    local list = state.undecided_copies
-    if list == nil then return 0 end
-    local done = 0
-    for key, class_name in pairs(list) do
-        if done >= limit then break end
-        done = done + 1
-        local obj = resolve_component(key)
-        if obj == nil then
-            list[key] = nil
-        else
-            local owner = soft(function() return obj:GetOwner() end)
-            local owner_name = usable(owner) and full_name(owner) or nil
-            if owner_name ~= nil then
-                list[key] = nil
-                if is_hero_copy(owner_name) then
-                    add_copy_entry(obj, type(class_name) == "string" and class_name or nil, owner_name)
-                end
-            end
-        end
-    end
-    if next(list) == nil then state.undecided_copies = nil end
-    return done
-end
 
 local function scan()
     if not state.enabled then return end
@@ -4016,32 +4023,34 @@ local function scan()
         end
         return
     end
-    -- Spawned components are classified here, in batches, instead of inside the listener callback:
-    -- the callback runs while the object is still being constructed, and every game-thread hop it took
-    -- was a queued job (see the spawn intake section above).
-    --
-    -- A level load queues thousands at once (measured: ~4400 in the first second), and the hero is
-    -- somewhere in that queue: while he has not been adopted the batch is much larger, so adoption does
-    -- not wait for the backlog. That is during loading, where the extra work is invisible.
-    local batch = config.spawn_batch or 300
-    if state.actor_name == nil or state.body == nil then
-        batch = config.spawn_batch_load or 4000
-    end
-    drain_spawns(batch)
-    retry_deferred(config.spawn_retry or 32)
+    local phase_start = now_ms()
+    drain_garments(config.garment_batch or 16)
     discover_hero()
     setup()
+    phase_setup = now_ms() - phase_start
+
     -- Runs whether or not the retarget is set up (see sweep_other_heroes): the prologue map plays as
     -- the young hero, where the mod has no carrier of its own, but its cutscene copies still need this.
+    phase_start = now_ms()
     sweep_other_heroes()
+    phase_sweep = now_ms() - phase_start
 end
 
--- The object listener's callback. Append only: the notification fires while the object is still being
--- constructed, so nothing is read here, and no game-thread job is queued either. `scan()` drains the
--- queue and does the reading/classification (see the spawn intake section above).
-local function on_new_object(obj)
+-- The only object listener left, and it is registered on two classes that spawn a handful of times per
+-- session: a Chaos Cloth garment and a hair groom appear together with a hero (or a hero copy), so they
+-- are a cheap "a hero-shaped actor just appeared" signal.
+--
+-- Why nothing else is listened to: registering `NotifyOnNewObject` on `SkeletalMeshComponent` /
+-- `StaticMeshComponent` looks harmless from inside the callback (it only appended to a queue), but the
+-- cost is in UE4SS's dispatch - it builds a Lua userdata and calls into Lua for every matching object,
+-- measured at up to ~14800 notifications in one fight, which stalled the game thread for about a second
+-- at a time, repeatedly, while the game's audio kept playing. A control run with the Lua half disabled
+-- was smooth, so that dispatch was the cause. The hero is found by polling instead (see discover_hero).
+local function on_new_garment(obj)
     if obj == nil or config.probe_only then return end
-    queue_spawn(obj)
+    -- nothing is read here: the object is still under construction. `scan()` reads it one scan later
+    -- (see `adopt_garment`) and, for a cutscene copy, hides that actor's components from its own subtree.
+    queue_garment(obj)
 end
 
 local function toggle_ours()
@@ -4051,16 +4060,6 @@ local function toggle_ours()
     end
     trace("carrier visible=" .. tostring(state.show_ours))
 end
-
--- Wall clock in milliseconds. `os.mtime` is the UE4SS extension; the fallback keeps the harness (plain
--- Lua) working.
-local function now_ms()
-    if type(os.mtime) == "function" then return os.mtime() end
-    return os.clock() * 1000
-end
-
-local scan_last_end = nil
-local scan_last_cost = 0
 
 local function boot()
     trace("boot, mod_dir=" .. tostring(mod_dir))
@@ -4116,7 +4115,7 @@ local function boot()
                 local expected = config.rescan_interval * 1000
                 local gap = started - scan_last_end
                 if gap > expected * (config.profile_gap_factor or 2.0) then
-                    trace(string.format(
+                    trace_profile(string.format(
                         "profile: %.0fms stall before tick %d (previous scan took %.1fms)",
                         gap - expected, state.tick, scan_last_cost))
                 end
@@ -4125,43 +4124,29 @@ local function boot()
             scan_last_cost = now_ms() - started
             scan_last_end = now_ms()
             if config.profile_scans and scan_last_cost >= (config.profile_slow_ms or 15) then
-                trace(string.format("profile: scan took %.1fms (tick %d)", scan_last_cost, state.tick))
+                trace_profile(string.format(
+                    "profile: scan took %.1fms (tick %d | setup %.1f sweep %.1f other %.1f)",
+                    scan_last_cost, state.tick, phase_setup, phase_sweep,
+                    scan_last_cost - phase_setup - phase_sweep))
             end
             if not ok then trace_problem("scan error: " .. tostring(err)) end
         end)
         trace("periodic loop registered")
     end
 
-    -- Object listeners. `NotifyOnNewObject` runs this callback inside the engine's object-construction
-    -- path, once per skeletal / static mesh component the game creates - measured: 5600 components in
-    -- two minutes of normal play, 99% of them level props. It is what makes the hero discovery event
-    -- driven instead of a guess: the moment the game spawns the hero's parts (also after a travel, a
-    -- wardrobe change or a mode switch) the mod knows about them.
+    -- Object listeners. Only the two classes that spawn a handful of times per session (see
+    -- `on_new_garment`): they are the cheap signal that a hero-shaped actor appeared, which is when the
+    -- copy / garment caches have to be rebuilt.
     --
-    -- It was removed once to cut the cost, and that broke the mod outright: the polling replacement
-    -- never saw the hero (see the tick comment in `scan()`), so nothing was adopted and the original
-    -- outfit came back. The listener therefore stays, but the callback now only appends the object to a
-    -- queue (`on_new_object`); the classification runs in `scan()`. That removed two game-thread jobs
-    -- per component, which was the actual cost.
+    -- The engine mesh classes are deliberately NOT registered any more. They cover the whole level, and
+    -- a fight produced ~14800 notifications in a couple of minutes; UE4SS builds a Lua userdata and
+    -- calls into Lua for each one, and that stalled the game thread for about a second at a time. A
+    -- control run with the Lua half disabled was smooth, which is what identified it.
     local ok, err = pcall(function()
-        NotifyOnNewObject("/Script/Engine.SkeletalMeshComponent", on_new_object)
-        -- some of the hero's accessories are static meshes
-        NotifyOnNewObject("/Script/Engine.StaticMeshComponent", on_new_object)
+        NotifyOnNewObject("/Script/ChaosClothAssetEngine.ChaosClothComponent", on_new_garment)
+        NotifyOnNewObject("/Script/HairStrandsCore.GroomComponent", on_new_garment)
     end)
     trace("NotifyOnNewObject ok=" .. tostring(ok) .. (ok and "" or (": " .. tostring(err))))
-
-    -- The two classes the listener provably does not report (the class census in the log: cloth and groom
-    -- components existed while neither ever showed up). Registered here as well, so a garment created
-    -- later - a wardrobe change, a Climax variant - is picked up without waiting for the next walk. A
-    -- class that is already covered fires twice; `add_copy_entry`/`cloth_index` dedupe.
-    for _, class_path in ipairs({
-        "/Script/ChaosClothAssetEngine.ChaosClothComponent",
-        "/Script/HairStrandsCore.GroomComponent",
-    }) do
-        local registered, register_err = pcall(NotifyOnNewObject, class_path, on_new_object)
-        trace("NotifyOnNewObject " .. class_path .. " -> ok=" .. tostring(registered) ..
-            (registered and "" or (": " .. tostring(register_err))))
-    end
 end
 
 boot()

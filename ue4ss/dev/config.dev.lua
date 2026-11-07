@@ -30,10 +30,11 @@ return {
     live_physics_keys = true,
 
     -- the level-wide searches are cheap enough to run often while developing, and they fill the caches
-    -- immediately instead of after a few seconds
-    target_rescan_scans = 20,
-    copy_rescan_scans = 2,
-    discover_every = 1,
+    -- immediately instead of after a few seconds. These MATCH the release values on purpose: the moment
+    -- they differ, "it is smooth in dev but stutters in release" becomes possible.
+    target_rescan_scans = 120,
+    copy_rescan_scans = 60,
+    discover_every = 4,
 
     -- The attach-chain log walks the whole UObject array on every scan, which is a hitch of its own; it
     -- is off by default and turned on only while a weapon-attachment question is being investigated.

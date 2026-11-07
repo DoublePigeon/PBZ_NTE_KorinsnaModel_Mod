@@ -816,10 +816,12 @@ Pelvis Motion 算出的位移被覆盖 → 骨盆高度恒定，只有四肢在�
 | 日志 | 每行都写 | release 只写「出问题」的行（`log_level=1`），dev 才全写（`log_level=2`） |
 | 监听器 | 每次回调都可能写一行 | 回调只做两跳 `ExecuteInGameThread` 后转交 `inspect_new`，诊断行都在 level 2 |
 
-**关于 `NotifyOnNewObject`（监听器）：保留。** 它确实挂在引擎的对象构造路径上、读图/过场会触发上万次，
-但它也是**唯一可靠的「英雄出现了」信号**：一次把它换成轮询，结果轮询因为计数器 bug 一次都没能再跑
-（§6.26），整局 mod 完全没生效——原版衣服、无动画、武器挂在魂身上。取舍是：
-**监听器留着保正确性，卡顿从「每轮三次搜索」和「日志」里省**。
+**关于 `NotifyOnNewObject`（监听器）：2026-11 已改为「只监听稀有类」，见 §12。**
+旧结论是「监听器必须保留在引擎网格基类上」，因为当时轮询找不到英雄。后来的排查证明那是个
+**枚举 bug**（`K2_GetComponentsByClass` 返回的 TArray 元素是空包装，§12.7），而不是「轮询不可行」：
+把监听器从 `SkeletalMeshComponent`/`StaticMeshComponent` 上摘掉、换成「缓存 pawn + 按 owner 定向枚举
++ 子树遍历」之后，英雄接管、武器跟随全部正常，而战斗时那一秒级的卡顿消失了。
+现在只监听 `ChaosClothComponent` / `GroomComponent` 这两个稀有类，作为「过场副本出现了」的信号。
 
 ### 6.25.1 「用组件树替代全关卡搜索」这条路走不通（已回退）
 
@@ -873,38 +875,41 @@ shadow: 0 part meshes on the hero
 
 ## 7. 运行期脚本（`ue4ss/KorinsnaRetarget`）
 
-### 7.1 两个版本：release 与 dev
+### 7.1 三个版本：release / dev / perf
 
-脚本只有一份代码，两个安装版本：
+脚本只有一份代码，安装时用不同的 overlay 切换日志与诊断：
 
 | 版本 | 安装命令 | 差异 | 用途 |
 | --- | --- | --- | --- |
 | **release**（默认） | `tools\install_lua.ps1` | `log_level=1`：**只在出问题时写日志**（健康的整局会话不会产生日志文件） | 游玩 |
 | **dev** | `tools\install_lua.ps1 -Profile dev` | 额外装 `config.dev.lua`：`log_level=2` 全量日志 + 各类只读普查（`report_*`） | 排障 / 开发 |
+| **perf** | `tools\install_lua.ps1 -Profile perf` | 行为同 release，只额外打开 `profile_scans`（`profile:` 行按 level 1 写，所以静默配置下也能看到） | **测卡顿** |
 
-**行为完全一致**：两个版本都注册 `NotifyOnNewObject` 监听器、都用同一套锚定与看门狗逻辑，
-差别只有日志和普查开关。所以 dev 里看到的现象就是 release 里会发生的事。
+**行为完全一致**：两者都注册同一组监听器、都用同一套锚定与看门狗逻辑，差别只有日志和普查开关。
+所以 dev 里看到的现象就是 release 里会发生的事（dev 的 `target_rescan_scans` / `copy_rescan_scans` /
+`discover_every` 也被刻意设成与 release 相同的值，否则会出现「dev 流畅、release 卡」的错觉）。
 
-`install_lua.ps1` 会先清空目标目录再拷，所以两个版本不会混在一起（`config.dev.lua` 只有 dev 才有）；
+> **测卡顿必须用 perf 档，不能用 dev**：dev 自己会写大量日志，测到的是日志器而不是 mod。
+> 2026-11 那次「卡成 PPT」的排查就是先在 dev 里看着「scan 只有 2 ms」而找不到原因（§12.1）。
+
+`install_lua.ps1` 会先清空目标目录再拷，所以各版本不会混在一起（`config.dev.lua` 只有 dev/perf 才有）；
 它也顺手维护 `mods.json`，并清掉上一次的日志（`-KeepLog` 可保留）。
-
-> 为什么监听器不能只在 dev 里：它是唯一可靠的「英雄出现了」信号。曾经为了省开销改成轮询，
-> 结果因为一个计数器 bug 整局都没生效（§6.26）。卡顿从「每轮全关卡搜索」那里省（§6.25）。
 
 ### 7.2 每轮扫描都做什么（性能预算）
 
-`scan()`（每 0.5 秒）→ `discover_hero()`（仅在英雄未知时真的查）→ `setup()` → `sweep_other_heroes()`。
-
-`setup()` 里**没有全关卡搜索**（§6.25）。每轮的实际工作量：
+`scan()`（每 0.5 秒）→ `drain_garments()`（布料通知，稀有）→ `discover_hero()`（只在英雄/载体不全时真的查）
+→ `setup()` → `sweep_other_heroes()`。完整架构与取舍见 **§12**。
 
 | 动作 | 次数 | 说明 |
 | --- | --- | --- |
-| 全关卡搜索（武器/刀鞘/腰后刀） | 1 次 `FindAllOf("SkeletalMeshComponent")` | 结果按名字缓存，三个 job 共用（`target_rescan_scans=1`） |
+| 武器 / 刀鞘 / 背挂发现 | 2 次 `GetChildrenComponents` | **局部**遍历英雄源组件 + 载体的子树，`classify_target` 逐个判 |
+| 全关卡搜索（兜底审计） | 每 120 轮 1 次 | `refresh_targets()`，约 40 ms；换图/接管时 `reset_targets()` 强制一次 |
+| 英雄发现（轮询） | 每 4 轮 1 次（仅在源/载体不全时） | `FindAllOf` + `owner == pawn`；接管完整后降到 60 轮审计 |
 | 缓存解析 | 约 6 次 `StaticFindObject` | 3 件武器 / 鞘 / 刀，名字查表 |
 | 姿势看门狗 | 1–2 次属性读 + 4 次骨读 | `LeaderPoseComponent`、`GetPostProcessInstance`、骨位移兜底 |
-| `refresh_from_actor` | 1 次 `K2_GetComponentsByClass` | 约 25 个组件 |
+| `refresh_from_actor` | **0 次全关卡** | 改用缓存的 pawn + 定向枚举（`K2_GetComponentsByClass` 在本 build 不可用，§12.7） |
 | 材质守卫 / 阴影 / 角色对齐 | 各 1 次 | 全是 O(1) |
-| 副本清扫 | 每 4 轮 / 有新副本时 | 5 个组件类各一次搜索，缓存在名字里 |
+| 副本清扫 | 每个副本 actor 一次全关卡重建 | 由布料通知触发，按 actor 去重（§13.3） |
 | 日志 | release **不写** | 只有引擎调用失败 / scan 报错才写一行 |
 
 `main.lua` 的结构：`boot()` → 每 `rescan_interval`（0.5s）跑一次 `scan()`/`setup()`
@@ -927,9 +932,9 @@ shadow: 0 part meshes on the hero
 | `hide_copy_bodies` / `hide_copy_body_meshes` | `true` / `{ "Hun_Body_Simple" }` | 隐藏过场 / 预览副本上的原版身体（§6.19） |
 | `hide_hero_cloth` | `true` | 隐藏英雄的 Chaos Cloth 服装组件（§6.19） |
 | `hide_copy_outfit` | `true` | 副本上除承载网格与武器外全部隐藏（§6.19） |
-| `copy_rescan_scans` / `copy_rescan_min_scans` | `60` / `4` | 副本组件列表的重建周期与最小间隔（监听器发现新副本时会提前触发，§6.19 / §6.25） |
-| `target_rescan_scans` | `1` | 武器 / 刀鞘 / 腰后刀的全关卡搜索周期（每轮一次，三个 job 共用结果，§6.25） |
-| `discover_every` / `discover_audit_scans` | `4` / `60` | 英雄未知时的轮询间隔 / 已知后的审计间隔（监听器是主路径，§6.26） |
+| `copy_rescan_scans` / `copy_rescan_min_scans` | `60` / `4` | 副本组件列表的全关卡重建周期与最小间隔；新副本由布料通知按 actor 提前触发一次（§13.3） |
+| `target_rescan_scans` | `120` | 武器 / 刀鞘 / 腰后刀的**兜底审计**周期；平时靠英雄子树局部遍历发现（§12.6） |
+| `discover_every` / `discover_audit_scans` | `4` / `60` | 英雄「源+载体」不全时的轮询间隔 / 完整后的审计间隔（轮询是唯一发现路径，§12.5） |
 | `pose_watchdog` | `true` | 姿势卡住（游戏重设 leader pose）时立刻清掉并重建，见 §6.17 |
 | `pose_bone_fallback` | `true` | 骨位移窗口兜底（慢速路径，§6.17） |
 | `pose_step_move_cm` / `pose_step_stuck_cm` | `0.5` / `0.3` | 每轮分类阈值（仅兜底路径使用） |
@@ -1083,7 +1088,7 @@ ground: pelvis src -1240.1 ours -1189.4 (+50.7) | foot src -1282.7 ours -1219.9 
 | 跨扫描缓存 | 只存对象名，用前 `StaticFindObject` 重新解析（§6.22） | 若有新的缓存需求，沿用这个模式，不要保存 UObject 引用 |
 | 运行期开销 | 事件驱动缓存（§12）：监听回调只入队，全关卡扫描只剩换图/接管各一次 + 10s 一次的武器兜底 + 布料两类 | 若还有周期性卡顿，用 dev 的 `profile:` 行区分「脚本慢」和「引擎卡」 |
 | 姿势恢复 | 直接读 `LeaderPoseComponent`，下一轮即恢复（§6.17） | 若某天该属性读不到，`pose_bone_fallback` 仍会兜底（慢 ~2 秒） |
-| 武器握点 | 单手/双持按手骨距离常数吸附；`*_child` 挂点的御剑完全交给游戏（§13.1） | 双手武器（斩马刀）左手不在杆上，原因已查明（§13.2），修法方向也写明 |
+| 武器握点 | 单手/双持按手骨距离常数吸附；`*_child` 挂点的御剑完全交给游戏（§14.1） | 双手武器（斩马刀）左手不在杆上，原因已查明（§14.2），修法方向也写明 |
 | 收起的武器 | 挂到 `Bip001-Spine` + 沿背面外推 2cm（§5.8.1） | 若某类大武器在背上穿模，可按武器类型给不同的锚骨/外推 |
 | 姿势丢失 | 看门狗 2 秒内重建（§6.17） | 若能找到游戏重设 leader pose 的那个调用点，可在源头阻止而不是事后重建 |
 | 过场副本 | 运行时隐藏副本身上除我们网格与武器外的一切（§6.19） | 更彻底的做法是在资产层把 `Hun_Body_Simple` 也替换成空白网格（会丢失重定向源，需另找姿势来源） |
@@ -1166,75 +1171,193 @@ ground: pelvis src -1240.1 ours -1189.4 (+50.7) | foot src -1282.7 ours -1219.9 
 | `report_physics_nodes` | 一次性回读节点参数、球/胶囊数量与绑定情况 |
 | `profile: scan took …` | 脚本自身耗时 |
 
-## 12. 运行期性能：把「定期全关卡扫描」换成事件驱动缓存
+## 12. 运行期性能：卡顿的四个真实成因与最终架构
 
-### 12.1 先量化，再动手
+这一节记录的是一次完整的排查：症状是「每隔一段时间卡成 PPT，十几秒到一分多钟，打怪时更容易」。
+过程里有三次错误归因，结论都来自**对照实验和 quantized 到毫秒的探针**，不是猜测。
+按量级从大到小排列，四条机制最后都修掉了。
 
-`NotifyOnNewObject` 的类普查（dev 版 `report_listener_classes`）实测，约 2 分钟正常游玩：
+### 12.1 方法论：先做对照，再读探针
 
-| 类 | 次数 |
-| --- | --- |
-| `StaticMeshComponent` | 3656 |
-| `SplineMeshComponent`（子类） | 1346 |
-| `InstancedStaticMeshComponent`（子类） | 380 |
-| `SkeletalMeshComponentBudgeted`（子类） | 129 |
-| `SkeletalMeshComponent` | 89 |
-| **`ChaosClothComponent`** | **0**（当时场景里确实有 4 个布料构件） |
-| **`GroomComponent`** | **0** |
+| 步骤 | 做法 | 得到的结论 |
+| --- | --- | --- |
+| 1 | 给 `scan()` 计时，并把「两次 scan 的间隔 vs 预期间隔」分开记录（`profile:` 行，见 12.6） | 我们的扫描只有 2–7 ms，而空档长达 1 s |
+| 2 | 现象是「画面卡、声音正常」 | 游戏**线程**被占，不是 GPU/加载 |
+| 3 | `mods.json` 里关掉 Lua 模组（pak 保留） | **游戏立刻流畅** → 卡顿确实来自 Lua |
+| 4 | 再移走 pak（纯原版） | 纯原版也流畅，排除资产/引擎设置 |
 
-结论三条：
+关键教训：**`profile: scan took` 只统计 `scan()` 内部**。写在 `scan()` 之外的东西（对象监听回调、
+`ExecuteInGameThread` 队列、日志的同步文件 I/O）在探针里**完全不可见** —— 第一轮排查就是被这一点
+误导，盯着「scan 只有 2 ms」而找不到原因。
 
-1. `NotifyOnNewObject` **按 `IsA` 匹配子类**（三种子类都被通知到），所以副本的骨骼/静态网格组件可以靠它抓。
-2. **Chaos 布料与 Groom 收不到通知** —— 只靠监听器会直接让「过场里原主角衣服又出现」回归，
-   这两类必须单独保留一次「全关卡 + 只查这两个稀有类」的扫描。
-3. 通知时 `owner` 读不到的比例约 3%，所以「生成瞬间分类」不可靠，需要延迟复核。
+### 12.2 机制一（最大）：`NotifyOnNewObject` 挂在引擎基类上
 
-旧实现每条通知要 2 次 `ExecuteInGameThread` 跳转（2 分钟 ≈ 11200 个 game-thread 任务）。
+**曾经的做法**：注册
 
-### 12.2 现在的结构
+```lua
+NotifyOnNewObject("/Script/Engine.SkeletalMeshComponent", on_new_object)
+NotifyOnNewObject("/Script/Engine.StaticMeshComponent", on_new_object)
+```
 
-| 环节 | 做法 |
-| --- | --- |
-| 监听回调 | 只做 `spawn_queue[tail++] = obj`（零引擎调用、零跳转） |
-| 分类 | `scan()` 里批量消费：正常 300/次；**英雄尚未接管时 4000/次**（关卡加载时队列一次涌入约 4400 个，接管不能被道具堵住） |
-| 延迟列表 | `owner == nil` 的进 `undecided_copies`，每次 scan 重判 32 个 |
-| 副本/布料缓存 | 判中即 `add_copy_entry()` 增量入表，`copy_index` / `cloth_index` 去重（重复通知天然幂等） |
-| 防名字复用 | 缓存 entry 记下 `owner`，`apply_copy_hiding` 每次复解析后**再比对 owner** |
-| 死引用 | 直接从表里摘除并释放名字（不再置 `copy_dirty` 触发重扫） |
-| 全关卡扫描 | 只剩：① 换图 / 英雄接管各一次（`collect_copy_components`）；② 布料/Groom 两类稀有类（`collect_hero_garments`）；③ `refresh_targets` 每 20 tick（武器/刀鞘/背挂，新增生成时分类） |
-| 英雄部件阴影 | `hero_part_components()` 直接读 `state.hidden_list`（那张表本来就是英雄本人的部件集合），完全不走搜索 |
+**它原本的作用**：让「英雄的部件出现了」变成事件驱动。历史上纯轮询版本确实找不到英雄（原因见 12.5 的
+`K2_GetComponentsByClass` 坑），所以监听器被当成必需品，甚至写过「去掉它就整个坏掉」的注释。
 
-### 12.3 被删掉的周期性开销
+**实际代价**：这两个类是**整个世界的基类**。实测一场战斗里 `dropped` 计数累计到约 14800，说明短时间
+内有上万次通知；`NotifyOnNewObject` 按 `IsA` 匹配子类（`SplineMeshComponent`、`InstancedStaticMeshComponent`、
+`SkeletalMeshComponentBudgeted` 全部命中），UE4SS 每次都要构造一个 Lua userdata 并调用进 Lua。
+**回调体再轻也没用** —— 成本在分发本身。累计起来就是那一个个约 1 秒的空档。
 
-| 原开销 | 处理 |
-| --- | --- |
-| 每 60 tick（30s）一次全关卡 `FindAllOf("SkeletalMeshComponent")`（`discover_hero` 的兜底巡视） | 英雄已接管且身体存活时**直接跳过**；只剩「从没见过英雄 / 英雄丢了」才扫 |
-| 每 20 tick（10s）一次全关卡扫描（`hero_part_components`） | 改用隐藏列表 |
-| 每 0.5s 一次全关卡扫描（`refresh_targets`，release 也是） | 生成时用 `classify_target()` 分类；周期兜底放宽到 20 tick |
-| 每 scan 一次全关卡扫描（`watch_weapon_chain`，dev 独有） | 默认关闭，只在查武器挂点时打开 |
-| 5 类 × 全关卡（`collect_copy_components`）+ 2 趟（`collect_hero_garments`） | 见 12.2 |
+**修法**：引擎网格类**不再监听**。见 12.3。
 
-### 12.4 剩下的可接受开销
+### 12.3 机制二：`StaticFindObject` 命中不存在名字时的慢路径
 
-- 每 0.5s：`drive_carrier`（清 leader pose）、`watch_pose`（姿态看门狗）、`guard_materials`、按缓存表 re-hide
-- 每 1s：`quiet_blank_parts`（遍历隐藏列表，关阴影/主 pass）
-- 每 10s：`refresh_targets`（一次全关卡，兜底）
-- 换图 / 接管：各一次副本全扫
-- 布料/Groom：`copy_dirty` 时一次两类全扫
+**曾经的做法**：`resolve_component(key)` 用 `StaticFindObject(key)` 把缓存的名字重新解析成对象（因为
+缓存的 UObject 引用会变成悬垂指针，§6.22）。
 
-### 12.5 卡顿定位工具（dev）
+**它原本的作用**：安全地使用跨帧缓存 —— 名字是字符串，先解析再触碰，避免在已释放对象上调用引擎函数。
+
+**实际代价**：名字**已经不存在**时，`StaticFindObject` 走全局查找的慢路径（实测约 10 ms/次）。
+一旦有一条「owner 读不到」的延迟列表（战斗时会被无限追加），每轮重试 32 个就是 300 ms，
+连续几轮就是十几秒。探针里的典型证据：
 
 ```
-profile: scan took 23.4ms (tick 812)              ← 我们自己的脚本慢
+profile: scan took 323.0ms (tick 51 | ... drain 323.0 ...)   ← 但这一轮 drained 0
+```
+
+**修法**：延迟列表限量 32 条、**每条只重试一次**、且只收「网格名含 `Hun` 或组件名以 `mesh`/`Character`
+开头」的对象。真判不出来的交给周期扫描。同时把**热路径**上的 `try()`（失败会同步写日志文件）
+换成 `soft()`。
+
+### 12.4 机制三：日志是「每条一次同步文件写」
+
+`try(label, fn)` 失败会调 `trace_problem` → `io.open` + 写入 + `io.close`。它原本的作用是**让失败可见**
+（「一个被吞掉的错误是这个 mod 最难调的原因」）。
+
+问题在于它不区分「我们关心的对象」和「关卡里别人的对象」：挂在基类上的 `try` 一旦对别人的组件失败，
+就会在游戏线程上做几百次文件打开。修法与 12.3 相同：热路径改 `soft`，真正的失败用一次性 trace 记录。
+
+### 12.5 机制四：队列里堆积的 UObject 引用 → Lua GC 停顿
+
+有一版实现把通知对象放进队列、按「数量」批量处理，其中「英雄未接管时每轮 4000 个」。两个后果：
+
+1. **单帧尖峰**：4000 个分类在一个 game-thread 回调里跑完（每个几十次反射调用）。
+2. **GC 停顿**（更隐蔽）：`dropped 7010` 说明队列长期顶在上限，几千个 UObject userdata 成为 GC 的
+   巨大根集合。证据是「耗时与数量无关」：
+
+```
+profile: scan took 1125.0ms (tick 98, drained 80 ...)
+profile: scan took 1102.0ms (tick 100, drained 32 ...)
+```
+
+处理 80 个和 32 个耗时几乎一样 → 成本不在分类，而在回收阶段。
+
+**结论**：数量上限解决不了问题，**时间预算 + 小上限**才解决。最终连队列一起删掉了（12.6）。
+
+### 12.6 最终架构
+
+| 关注对象 | 机制 | 触发/节奏 |
+| --- | --- | --- |
+| 英雄本体（重定向源 + 载体） | **定向轮询**：缓存 pawn 对象（`valid()` 校验，失效才重新枚举），只枚举 `owner == pawn` 的骨骼网格组件，同时喂给 `consider()` | 未接管/缺载体时 4 tick（2 s）；接管完整后 60 tick（30 s）审计 |
+| 武器 / 刀鞘 / 背挂 | **定向子树遍历**：`children_of(源组件)` + `children_of(载体)` → `classify_target()` | 每 scan（0.5 s） |
+| 布料 / Groom（原主角衣服本体） | **监听器**，但只注册这两个稀有类；回调只入 64 条小队 | 生成即触发 |
+| 过场副本 | 布料通知 → 读出 `owner` → 若是 hero copy → **每个 actor 触发一次**全关卡重建（`copy_scanned` 去重），之后按名字逐帧重新隐藏 | 每个副本一次 |
+| 英雄部件阴影 | 直接读 `state.hidden_list`（隐藏列表本身就是那批部件） | 每 2 scan |
+| 兜底 | `refresh_targets()` 全关卡审计 | 每 120 tick（60 s） |
+| 深兜底 | `collect_copy_components` / `collect_hero_garments` | 列表不存在时（换图/首次接管） |
+
+**测量结果**：普通游玩 `scan took` 稳定在 2–7 ms；过场里最多一次 76–284 ms（每个副本一次的重建）。
+
+### 12.7 三个必须记住的引擎/UE4SS 坑
+
+1. **`K2_GetComponentsByClass` 返回的 TArray 元素是空包装**，逐个索引只会拿到 `null`。
+   按 actor 找组件必须用 `FindAllOf(短类名)` + `GetOwner()` 比对。
+   这个坑曾经让「纯轮询」版本永远找不到英雄，从而被误判成「轮询不可行、必须用监听器」。
+2. **`GetChildrenComponents(true, out)` 的 out 参数是真 Lua 表**，可以直接读 —— 所以
+   `children_of()` 可用，而 1 里的那个不可用。两者差别只在这条注释里，很容易混淆。
+3. **`GetAllSocketNames()` 的元素是 `RemoteUnrealParam`**，必须 `raw:get():ToString()`。
+
+另外：`FindAllOf` 一次全关卡遍历约 **40 ms**（>150k 对象），所以任何「每 N 秒扫一遍」的方案都要按
+40 ms 计价；`GetChildrenComponents` 是局部操作，可以每帧跑。
+
+### 12.8 定位工具
+
+`perf` 档（`tools\install_lua.ps1 -Profile perf`）＝ **release 行为 + 只写 `profile:` 行**。
+用 dev 档测卡顿是错的：dev 自己会写大量日志，测到的是日志器而不是 mod。
+
+```
+profile: scan took 23.4ms (tick 812 | setup 3.0 sweep 18.0 other 2.4)
+                                             ← 我们自己慢，且能看出是哪一段
 profile: 640ms stall before tick 813 (previous scan took 3.1ms)
-                                                  ← 引擎自己在卡（上一轮我们的耗时很正常）
+                                             ← 上一轮我们只花了 3ms：卡在 scan 之外
 ```
 
-这两行能直接区分「脚本的锅」和「引擎的锅」，不要再靠感觉猜。
+第二行出现且 `scan took` 很小，就往「scan 之外」找：对象监听回调、`ExecuteInGameThread` 队列、
+日志文件写。这一条是这次排查的分水岭。
 
-## 13. 武器挂点：御剑与双手武器的实测结论
 
-### 13.1 御剑（痴者残剑 / 痴者醉剑）：**保留游戏挂点**
+## 13. 部件隐藏与「动画必须仍然正确」：当前全部做法
+
+这个 mod 的视觉正确性靠三件事同时成立：**看见可琳思娜**、**看不见魂的部件**、**可琳思娜一直在被动画驱动**。
+三者互相牵制 —— 隐藏手段选错会直接把动画搞坏，所以这里把当前所有做法和背后的原因列全。
+
+### 13.1 三条隐藏路径，各有适用对象
+
+| 对象 | 做法 | 为什么不能用别的 |
+| --- | --- | --- |
+| 魂的身体/斗笠/围巾/长发/披风 | **资产层清除**（`ue/scripts/build_mod_assets.py` 把网格做成退化三角形） | 运行时 `SetVisibility` 每帧都要重新压一次（服装系统会复活它们），而资产层是永久的 |
+| 魂的身体组件（重定向源） | **运行时隐藏**：`SetVisibility(false,false)` + `SetHiddenInGame` + `SetCastShadow(false)` + `bCastHiddenShadow=False` | 它是唯一的姿势来源，**不能**在资产层清掉，只能"隐藏但继续计算" |
+| 过场副本的部件 | **运行时隐藏**（`state.copy_list`，逐帧重新压） | 副本是游戏新 spawn 的 actor，资产层替换管不到它们的组合；且它们**必须保持动画**给重定向用 |
+| 魂的衣服本体（Chaos 布料 / Groom） | **运行时隐藏**（`state.cloth_list`） | 它们不是骨骼网格组件，资产层清不掉；也不能靠骨骼网格的开关带走 |
+
+### 13.2 隐藏之后动画为什么还在：两个必要条件
+
+1. **`VisibilityBasedAnimTickOption = AlwaysTickPoseAndRefreshBones`** ＋
+   `bEnableUpdateRateOptimizations = False`（`force_anim_refresh`）。
+   隐藏的组件不再被渲染，引擎默认会降频甚至停止刷新骨骼 → retarget 复制到旧姿态 → 停在 A-pose。
+   这两项必须用 `ImportText` 写，**不能**直接写 Lua 值（UE4SS 会按 4 字节写 1 字节枚举，破坏相邻字段，§6.13）。
+2. **leader pose 必须清掉**（`drive_carrier`，每 scan）。
+   游戏在交互动画/过场后会重新执行 `SetLeaderPoseComponent`，让我们的载体变成"跟随者"，而跟随者
+   从不评估自己的动画 → 立刻变参考姿势。所以每 0.5 s 检查一次并清除，而不是等出事再修。
+
+### 13.3 过场副本：找到它们的三条路径（按代价排序）
+
+| 路径 | 触发 | 代价 | 用途 |
+| --- | --- | --- | --- |
+| 布料/Groom 通知 → 读 `owner` | 副本自带布料组件被创建 | 几次反射调用 | **主路径**：识别出副本 actor，并把它的布料本身隐藏掉 |
+| `children_of(actor_root_of(garment))` | 同上 | 局部遍历 | 尝试直接拿该 actor 的其它部件。实测**返回 0**（副本部件不在布料组件的子树里），所以只作为快路径 |
+| `collect_copy_components()` 全关卡重建 | 快路径失败时，每个副本 actor **一次**（`copy_scanned[actor]` 去重） | 2 趟全关卡（约 80–200 ms） | 兜底；也用于换图/首次接管 |
+
+要点：**去重键是副本 actor 名**，不是 tick。一个副本会报十几次布料组件，如果按 tick 节流就会反复重建，
+表现为「每隔几秒卡一小下」；按 actor 去重就只付一次。
+
+### 13.4 隐藏的正确性细节（都是踩过的坑）
+
+- **绝不隐藏 `Hun_Head_New` 上的载体**：那是可琳思娜自己。`apply_copy_hiding` 里 `entry.mesh ~= carrier_mesh_name`
+  是硬保护，`remember_hidden` 里还有一道 `key == carrier_name` 的拒绝。
+- **缓存只存名字，用前重新解析**（`resolve_component`），并且**再比对 `owner`**：引擎会复用对象名，
+  名字相同不代表还是那个对象（§6.22）。
+- **死引用就地摘除**，不要置 `copy_dirty` 触发重扫 —— 一次重扫是几趟全关卡，而摘除是 O(1)。
+- **只碰英雄自己的组件**：早期版本把所有骨骼网格踢出 base pass，导致 NPC 与铃铛变黑/丢材质（§6.24）。
+  现在所有遍历都先做 `owner` 判定。
+- **不要给魂自己的身体 `bPropagateToChildren`**：我们的载体挂在它下面，传播会把载体一起隐藏。
+- **`SetVisibility` 之外还要 `SetRenderInMainPass(false)` + `SetCastShadow(false)`**：
+  退化三角形虽然不可见，但阴影 pass 会因此出现闪烁黑斑（§6.24）。
+
+### 13.5 动画正确性的自检（不用进游戏就能看）
+
+| 检查 | 期望 |
+| --- | --- |
+| dev 日志 `carrier: leader pose cleared (nil)` | 每次都出现 |
+| dev 日志 `source: always-relevant` | 出现一次（`force_anim_refresh` 成功） |
+| dev 日志 `set_property: VisibilityBasedAnimTickOption = AlwaysTickPoseAndRefreshBones` | 出现，且**不能**有 `set_property FAILED` |
+| dev 日志 `copy: made <comp> evaluate the retarget` | 每个副本一次 |
+| dev 日志 `copy part: N component(s) … , M carrier(s)` | `N > 0`、`M ≥ 1`；长期 `N = 0` 说明快路径与重建都没生效 |
+| `watch_pose` 的 `pose_window` 统计 | `stuck` 计数不应持续增长 |
+
+
+## 14. 武器挂点：御剑与双手武器的实测结论
+
+### 14.1 御剑（痴者残剑 / 痴者醉剑）：**保留游戏挂点**
 
 - 痴者残剑：actor `BP_Weapon_Hun_ChiZheCanJian_C`，网格 `Hun_CanJian`，游戏挂点是
   **`weapon_r_child`**（一个可被动画驱动的骨骼，不是普通手部 socket）。
@@ -1246,7 +1369,7 @@ profile: 640ms stall before tick 813 (previous scan took 3.1ms)
 - 实现：`anchor_held_weapons()` 里 `driver_mount` 分支（socket 名含 `_child`）。
 - 注意：我们的骨架是 `Bip001-*`，**没有** `weapon_r_child` 这根骨，不能把武器改挂到自己的同名骨上。
 
-### 13.2 双手武器（斩马刀）：**未修，已查明原因**
+### 14.2 双手武器（斩马刀）：**未修，已查明原因**
 
 - 武器网格上**没有**第二握点 socket。`Hun_WangMingZhanMaDao` 的全部 socket：
   `TrailStart, BladeBloodStart, Sound_Weapon, BlueEyeSocket, HoldDeflect, Deflect_Middle,
@@ -1266,7 +1389,7 @@ profile: 640ms stall before tick 813 (previous scan took 3.1ms)
 - 后续若要修，正确的方向是「只在判定为双手姿势时、且只对右手挂点的武器，做一次最小旋转」，
   并且**必须在最小角度解上做符号判定**（比较与当前朝向的点积），回退验证要覆盖单手剑与御剑。
 
-### 13.3 通用坑
+### 14.3 通用坑
 
 - `GetAllSocketNames()` 返回 `TArray<FName>`，元素是 `RemoteUnrealParam`，
   必须 `raw:get():ToString()`；直接 `tostring(raw)` 得到的是 `RemoteUnrealParam: 0x…` 或
@@ -1275,7 +1398,7 @@ profile: 640ms stall before tick 813 (previous scan took 3.1ms)
 - 武器的 pivot 通常就是手感锚点，但痴者残剑这种**相对变换被游戏逐帧改写**的武器，
   用「世界空间偏移」做的任何修正都会被覆盖。
 
-## 14. 本轮新增常见问题
+## 15. 本轮新增常见问题
 
 | 现象 | 原因 / 处理 |
 | --- | --- |
@@ -1285,7 +1408,7 @@ profile: 640ms stall before tick 813 (previous scan took 3.1ms)
 | 静止就穿模、越站越陷 | `stiffness` 偏高把布料从碰撞结果里拉回；降刚度或加 `settings.radius` 余量 |
 | 裙子抽搐 | ① 物理没被完全移除（先用 `F6`/`enabled:false` 二分）② damping 太低 ③ 左右大腿球在中心线重叠 |
 | 头发穿脸/穿胸 | 头发 profile 没有碰撞球；加 `head_low/mid/top + neck + chest` |
-| 御剑不飞了 | 有人把它吸附到手骨上了；见 §13.1，`*_child` 挂点必须留给游戏 |
+| 御剑不飞了 | 有人把它吸附到手骨上了；见 §14.1，`*_child` 挂点必须留给游戏 |
 | 过场里原主角衣服又出现 | 检查 `cloth:` 日志：Chaos 布料/Groom 收不到生成通知，必须靠 `collect_hero_garments` 的两类扫描 |
 | 过场后 A-pose | 游戏重新 `SetLeaderPoseComponent`；`drive_carrier` 每 0.5s 兜一次，`watch_pose` 负责检测 |
 | Lua 改完没生效 | UE4SS 只在**启动时**加载脚本；装错 profile（`install_lua.ps1 -Profile dev/release`）也不会生效 |

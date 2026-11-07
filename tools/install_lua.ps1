@@ -11,18 +11,21 @@
   release (default): log_level=1, so a healthy session writes no log file at all; only a failing engine
   call or a scan error is written. Use it for playing.
   dev: log_level=2, every line plus the censuses. Use it for diagnosing.
+  perf: release behaviour (log_level=1, no per-component logging) plus the scan timer, so a freeze can be
+  measured without the logger itself being the cost. Writes `profile:` lines only.
 
-  Both are installed into the same mod folder, so installing one removes the other's extra file.
+  All three are installed into the same mod folder, so installing one removes the other's extra file.
 
 .PARAMETER Profile
-  release (default) or dev.
+  release (default), dev or perf.
 
 .EXAMPLE
   powershell -File tools\install_lua.ps1
   powershell -File tools\install_lua.ps1 -Profile dev
+  powershell -File tools\install_lua.ps1 -Profile perf
 #>
 param(
-    [ValidateSet("release", "dev")][string]$Profile = "release",
+    [ValidateSet("release", "dev", "perf")][string]$Profile = "release",
     [string]$GameRoot = "K:\SteamLibrary\steamapps\common\PBZ",
     [string]$RepoRoot = "J:\VS_Projects\PBZ_KorinsnaSkinMod",
     [switch]$KeepLog
@@ -47,6 +50,10 @@ if ($Profile -eq "dev") {
     $devConfig = Join-Path $devSource "config.dev.lua"
     if (-not (Test-Path $devConfig)) { throw "missing $devConfig" }
     Copy-Item $devConfig (Join-Path $target "config.dev.lua") -Force
+} elseif ($Profile -eq "perf") {
+    $perfConfig = Join-Path $devSource "config.perf.lua"
+    if (-not (Test-Path $perfConfig)) { throw "missing $perfConfig" }
+    Copy-Item $perfConfig (Join-Path $target "config.dev.lua") -Force
 }
 
 # UE4SS reads mods.json; keep the existing entries and just make sure ours is enabled
@@ -66,6 +73,8 @@ $list = Get-ChildItem $target -Recurse -File | Select-Object Length, FullName
 $list | Format-Table -AutoSize
 if ($Profile -eq "release") {
     Write-Host "   (release profile: log_level=1, only problems are written)"
+} elseif ($Profile -eq "perf") {
+    Write-Host "   (perf profile: log_level=1 + scan timer, writes 'profile:' lines only)"
 } else {
     Write-Host "   (dev profile: log_level=2, full log + diagnostics)"
 }

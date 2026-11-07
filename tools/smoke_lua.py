@@ -227,11 +227,11 @@ def check(profile, world):
     problems = []
     hero = world in ("hero", "late")
 
-    # The listeners are what make the hero discovery event driven, so BOTH profiles must register them.
-    # Four: the two engine base classes plus the cloth and groom classes the census proved are not
-    # covered by them.
-    if listeners != 4:
-        problems.append("%s: expected 4 object listeners, got %s" % (label, listeners))
+    # The listeners are what make the copy/garment caches event driven, so BOTH profiles must register
+    # them. Exactly two: the rare cloth and groom classes. The engine mesh classes are deliberately not
+    # registered - they fire for the whole level and their dispatch cost is what stalled the game.
+    if listeners != 2:
+        problems.append("%s: expected 2 object listeners, got %s" % (label, listeners))
     if "scan error" in text:
         problems.append("%s: a scan raised: %s" % (
             label, text.split("scan error:", 1)[1].splitlines()[0]))
